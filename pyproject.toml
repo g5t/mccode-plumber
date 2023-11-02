@@ -1,0 +1,19 @@
+[build-system]
+requires = ['setuptools>=60', 'setuptools_scm>=8.0']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'mccode-plumber'
+dependencies = [
+    'restage @ git+ssh://git@github.com/g5t/mcbifrost',
+    'mccode @ git+ssh://git@github.com/g5t/mccode-antlr.git@v0.0.7',
+    'mccode-to-kafka @ git+ssh://github.com/g5t/mccode-to-kafka.git',
+]
+dynamic = ['version']
+
+[project.scripts]
+mccode-plumber-conductor = 'mccode_plumber.conductor:main'
+mccode-plumber-splitrun = 'mccode_plumber.splitrun:main'
+
+[tool.setuptools_scm]
+
