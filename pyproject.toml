@@ -7,10 +7,10 @@ name = 'mccode-plumber'
 dependencies = [
     'p4p',
     'file-writer-control==1.3.0',
-    'restage @ git+ssh://git@github.com/g5t/mcbifrost',
-    'mccode @ git+ssh://git@github.com/g5t/mccode-antlr.git',
-    'mccode-to-kafka @ git+ssh://git@github.com/g5t/mccode-to-kafka.git',
-    'eniius @ git+ssh://git@github.com/g5t/eniius.git@antlr',
+    'restage',
+    'mccode-antlr',
+    'mccode-to-kafka @ git+https://github.com/g5t/mccode-to-kafka.git',
+    'eniius @ git+https://github.com/g5t/eniius.git@antlr',
 ]
 dynamic = ['version']
 
