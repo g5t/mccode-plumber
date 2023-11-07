@@ -24,7 +24,7 @@ def monitors_to_kafka_callback_with_arguments(broker: str, source: str):
 
 
 def main():
-    from mccode.loader import load_mcstas_instr
+    from mccode_antlr.loader import load_mcstas_instr
     args, parameters, precision = parse_args()
     instr = load_mcstas_instr(args.isntrument[0])
     callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker[0], args.source[0])

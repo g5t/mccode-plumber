@@ -7,7 +7,7 @@ from typing import Union
 
 
 def instr_parameters_to_nt_values(parameters):
-    from mccode.common.expression import DataType, ShapeType
+    from mccode_antlr.common.expression import DataType, ShapeType
     out = {}
     for p in parameters:
         expr = p.value
@@ -26,7 +26,7 @@ def instr_parameters_to_nt_values(parameters):
 
 
 def parse_instr_nt_values(instr: Union[Path, str]):
-    from mccode.loader.loader import parse_mccode_instr_parameters
+    from mccode_antlr.loader.loader import parse_mccode_instr_parameters
     if isinstance(instr, str):
         instr = Path(instr)
     with instr.open('r') as file:

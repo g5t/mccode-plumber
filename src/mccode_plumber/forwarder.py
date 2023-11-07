@@ -61,7 +61,7 @@ def reset_forwarder(pvs: list[dict], config=None, prefix=None, topic=None):
 
 def parse_registrar_args():
     from argparse import ArgumentParser
-    from mccode.loader.loader import parse_mccode_instr_parameters
+    from mccode_antlr.loader.loader import parse_mccode_instr_parameters
 
     parser = ArgumentParser(description="Discover EPICS PVs and inform a forwarder about them")
     parser.add_argument('-p', '--prefix', type=str, default='mcstas:')

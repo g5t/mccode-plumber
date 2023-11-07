@@ -240,7 +240,7 @@ def parameter_description(inst_param):
 
 
 def construct_writer_pv_dicts(instr: Union[Path, str], prefix: str, topic: str):
-    from mccode.loader.loader import parse_mccode_instr_parameters
+    from mccode_antlr.loader.loader import parse_mccode_instr_parameters
     with open(instr, 'r') as file:
         contents = file.read()
     parameters = parse_mccode_instr_parameters(contents)

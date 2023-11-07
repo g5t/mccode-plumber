@@ -15,7 +15,6 @@ dependencies = [
 dynamic = ['version']
 
 [project.scripts]
-mp-conductor = 'mccode_plumber.conductor:main'
 mp-splitrun = 'mccode_plumber.splitrun:main'
 mp-epics = 'mccode_plumber.epics:run'
 mp-forwarder-setup = 'mccode_plumber.forwarder:setup'
