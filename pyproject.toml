@@ -11,6 +11,7 @@ dependencies = [
     'mccode-antlr>=0.1.2',
     'mccode-to-kafka @ git+https://github.com/g5t/mccode-to-kafka.git',
     'eniius @ git+https://github.com/g5t/eniius.git@antlr',
+    'icecream',
 ]
 dynamic = ['version']
 
