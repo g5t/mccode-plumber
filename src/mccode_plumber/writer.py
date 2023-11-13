@@ -81,8 +81,8 @@ def a_log_as_of_20230626(ch: dict):
 def default_nexus_structure(instr: Union[Path, str], origin: str = None):
     """Create a default NeXus structure for the specified instrument using eniius"""
     import eniius
-    from mccode.loader import load_mcstas_instr
-    instrument = load_mcstas_instr(instr)
+    from .mccode import get_mcstas_instr
+    instrument = get_mcstas_instr(instr)
     nx = eniius.Eniius.from_mccode(instrument, origin=origin)
     return nx.to_nexus_structure(absolute_depends_on=True, only_nx=False)
 
@@ -233,17 +233,15 @@ def get_arg_parser():
 
 def parameter_description(inst_param):
     desc = f"{inst_param.value.data_type} valued McStas parameter '{inst_param.name}', "
-    desc += f"default: {inst_param.value}" if inst_param.has_value else "no default"
+    desc += f"default: {inst_param.value}" if inst_param.value.has_value else "no default"
     if inst_param.unit is not None:
         desc += f" and expected units of {inst_param.unit}"
     return desc
 
 
 def construct_writer_pv_dicts(instr: Union[Path, str], prefix: str, topic: str):
-    from mccode_antlr.loader.loader import parse_mccode_instr_parameters
-    with open(instr, 'r') as file:
-        contents = file.read()
-    parameters = parse_mccode_instr_parameters(contents)
+    from .mccode import get_mccode_instr_parameters
+    parameters = get_mccode_instr_parameters(instr)
     return [dict(name=p.name, dtype=p.value.data_type.name, source=f'{prefix}{p.name}', topic=topic,
                  description=parameter_description(p), module='f144', unit=p.unit) for p in parameters]
 

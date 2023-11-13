@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Union
 
 
-def instr_parameters_to_nt_values(parameters):
+def parse_instr_nt_values(instr: Union[Path, str]):
+    """Get the instrument parameters from a pickled Instr a or a parseable Instr file and convert to NTScalar values"""
     from mccode_antlr.common.expression import DataType, ShapeType
+    from .mccode import get_mccode_instr_parameters
     out = {}
-    for p in parameters:
+    for p in get_mccode_instr_parameters(instr):
         expr = p.value
         if expr.is_str:
             t, d = 's', ''
@@ -23,15 +25,6 @@ def instr_parameters_to_nt_values(parameters):
             t, d = 'a' + t, [d]
         out[p.name] = NTScalar(t).wrap(expr.value if expr.has_value else d)
     return out
-
-
-def parse_instr_nt_values(instr: Union[Path, str]):
-    from mccode_antlr.loader.loader import parse_mccode_instr_parameters
-    if isinstance(instr, str):
-        instr = Path(instr)
-    with instr.open('r') as file:
-        contents = file.read()
-    return instr_parameters_to_nt_values(parse_mccode_instr_parameters(contents))
 
 
 class MailboxHandler:
