@@ -6,7 +6,7 @@ class EPICSTestCase(unittest.TestCase):
         from uuid import uuid4
         from multiprocessing import Process
         from mccode_plumber.epics import main, instr_parameters_to_nt_values
-        from mccode.loader.loader import parse_mccode_instr_parameters
+        from mccode_antlr.loader.loader import parse_mccode_instr_parameters
         instr = 'define instrument blah(par1, double par2, int par3=1, string par4="string", double par5=5.5) trace end'
         self.pars = parse_mccode_instr_parameters(instr)
         self.pvs = instr_parameters_to_nt_values(self.pars)
