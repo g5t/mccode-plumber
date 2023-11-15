@@ -7,8 +7,8 @@ name = 'mccode-plumber'
 dependencies = [
     'p4p==4.1.11',
     'file-writer-control==1.3.0',
-    'restage',
-    'mccode-antlr>=0.1.2',
+    'restage==0.1.4',
+    'mccode-antlr[hdf5]==0.2.1',
     'mccode-to-kafka @ git+https://github.com/g5t/mccode-to-kafka.git',
     'eniius @ git+https://github.com/g5t/eniius.git@antlr',
     'icecream',
