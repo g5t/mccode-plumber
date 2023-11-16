@@ -6,24 +6,8 @@ import pickle
 
 
 def get_mcstas_instr(filename: Union[Path, str]) -> Instr:
-    from mccode_antlr.loader.loader import load_mcstas_instr
-    if not isinstance(filename, Path):
-        filename = Path(filename)
-    if filename.suffix == '.instr':
-        return load_mcstas_instr(filename)
-    elif filename.suffix == '.json':
-        print('No conversion (yet) from NeXus Structured JSON to McStas')
-    elif filename.suffix == '.pkl':
-        try:
-            with filename.open('rb') as file:
-                return pickle.load(file)
-        except pickle.UnpicklingError:
-            print('Could not unpickle file -- is it a McStas instrument?')
-    else:
-        print(f'Unknown file type {filename.suffix}')
-
-    raise RuntimeError(f'Could not load instrument from {filename}')
-
+    from restage.instr import load_instr
+    return load_instr(filename)
 
 def get_mccode_instr_parameters(filename: Union[Path, str]) -> tuple[InstrumentParameter]:
     from mccode_antlr.loader.loader import parse_mccode_instr_parameters
