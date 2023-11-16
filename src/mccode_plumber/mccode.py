@@ -19,17 +19,3 @@ def get_mccode_instr_parameters(filename: Union[Path, str]) -> tuple[InstrumentP
         return parse_mccode_instr_parameters(contents)
     # otherwise:
     return get_mcstas_instr(filename).parameters
-
-
-def pickle_mccode_instr(instr: Instr, filename: Union[Path, str]):
-    """Save a mccode_antlr.instr.Instr to a pickle file
-
-    Note:
-        This is intended to be used along with the plumber(s) in multiple containers to avoid
-        having to reparse the instrument file for each container. While also avoiding the
-        possibility of pickle-incompatibility between different versions of mccode_antlr.
-    """
-    if not isinstance(filename, Path):
-        filename = Path(filename)
-    with filename.open('wb') as file:
-        pickle.dump(instr, file)
