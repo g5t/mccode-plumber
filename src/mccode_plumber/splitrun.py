@@ -29,13 +29,14 @@ def sort_args(args: list[str]) -> list[str]:
 
 
 def parse_args():
-    from restage.splitrun import parse_splitrun_parameters, parse_splitrun_precision
+    from restage.range import parse_scan_parameters
+    from restage.splitrun import parse_splitrun_precision
     import sys
     sys.argv[1:] = sort_args(sys.argv[1:])
 
     args = make_parser().parse_args()
 
-    parameters = parse_splitrun_parameters(args.parameters)
+    parameters = parse_scan_parameters(args.parameters)
     precision = parse_splitrun_precision(args.P)
     return args, parameters, precision
 
