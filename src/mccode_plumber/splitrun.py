@@ -51,7 +51,7 @@ def main():
     from .mccode import get_mcstas_instr
     args, parameters, precision = parse_args()
     instr = get_mcstas_instr(args.instrument[0])
-    callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker[0], args.source[0])
+    callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker, args.source)
     return splitrun(instr, parameters, precision, split_at=args.split_at[0], grid=args.mesh,
                     seed=args.seed[0] if args.seed is not None else None,
                     ncount=args.ncount[0] if args.ncount is not None else None,
