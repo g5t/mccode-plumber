@@ -26,9 +26,12 @@ def convert_instr_parameters_to_nt(parameters):
 
 
 def parse_instr_nt_values(instr: Union[Path, str]):
-    """Get the instrument parameters from a pickled Instr a or a parseable Instr file and convert to NTScalar values"""
+    """Get the instrument parameters from an Instr a or a parseable Instr file and convert to NTScalar values"""
     from .mccode import get_mccode_instr_parameters
-    return convert_instr_parameters_to_nt(get_mccode_instr_parameters(instr))
+    nts = convert_instr_parameters_to_nt(get_mccode_instr_parameters(instr))
+    if 'mcpl_filename' not in nts:
+        nts['mcpl_filename'] = NTScalar('s').wrap('')
+    return nts
 
 
 class MailboxHandler:

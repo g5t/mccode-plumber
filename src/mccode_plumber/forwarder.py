@@ -70,9 +70,11 @@ def parse_registrar_args():
     parser.add_argument('-t', '--topic', type=str, help="The Kafka topic to instruct the Forwarder to send data to")
 
     args = parser.parse_args()
-    parameters = get_mccode_instr_parameters(args.instrument)
+    parameter_names = [p.name for p in get_mccode_instr_parameters(args.instrument)]
+    if 'mcpl_filename' not in parameter_names:
+        parameter_names.append('mcpl_filename')
     # the forwarder only cares about: "source", "module", "topic"
-    params = [{'source': f'{args.prefix}{p.name}', 'module': 'f144', 'topic': args.topic} for p in parameters]
+    params = [{'source': f'{args.prefix}{name}', 'module': 'f144', 'topic': args.topic} for name in parameter_names]
     return params, args
 
 
