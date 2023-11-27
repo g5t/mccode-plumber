@@ -44,7 +44,13 @@ def parse_args():
 def monitors_to_kafka_callback_with_arguments(broker: str, source: str):
     from functools import partial
     from mccode_to_kafka.sender import send_histograms
-    return partial(send_histograms, broker=broker, source=source), {'dir': 'root'}
+
+    def callback(*args, **kwargs):
+        print(f'monitors to kafka callback called with {args} and {kwargs}')
+        return send_histograms(*args, broker=broker, source=source, **kwargs)
+
+    # return partial(send_histograms, broker=broker, source=source), {'dir': 'root'}
+    return callback, {'dir': 'root'}
 
 
 def main():
