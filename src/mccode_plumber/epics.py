@@ -99,7 +99,7 @@ def update():
     args = parser.parse_args()
 
     ctx = Context('pva')
-    pv = ctx.get(args.address, timeout=0.01, throw=False)
+    pv = ctx.get(args.address, throw=False)
     if isinstance(pv, float):
         ctx.put(args.address, float(args.value))
     elif isinstance(pv, int):
