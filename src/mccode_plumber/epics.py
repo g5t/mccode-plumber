@@ -90,5 +90,27 @@ def stop(proc):
     proc.close()
 
 
+def update():
+    from argparse import ArgumentParser
+    from p4p.client.thread import Context
+    parser = ArgumentParser(description="Update the mailbox server with new values")
+    parser.add_argument('address', type=str, help='The mailbox address of the value to be updated')
+    parser.add_argument('value', type=str, help='The new value to be assigned to the mailbox')
+    args = parser.parse_args()
+
+    ctx = Context('pva')
+    pv = ctx.get(args.address, timeout=0.01, throw=False)
+    if isinstance(pv, float):
+        ctx.put(args.address, float(args.value))
+    elif isinstance(pv, int):
+        ctx.put(args.address, int(args.value))
+    elif isinstance(pv, str):
+        ctx.put(args.address, str(args.value))
+    else:
+        raise ValueError(f'Unknown type {type(pv)} (this is likely a vector that I can not handle yet?)')
+
+    ctx.disconnect()
+
+
 if __name__ == '__main__':
     run()

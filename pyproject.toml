@@ -17,6 +17,7 @@ dynamic = ['version']
 [project.scripts]
 mp-splitrun = 'mccode_plumber.splitrun:main'
 mp-epics = 'mccode_plumber.epics:run'
+mp-epics-update = 'mccode_plumber.epics:update'
 mp-forwarder-setup = 'mccode_plumber.forwarder:setup'
 mp-forwarder-teardown = 'mccode_plumber.forwarder:teardown'
 mp-writer-from = 'mccode_plumber.writer:print_time'
