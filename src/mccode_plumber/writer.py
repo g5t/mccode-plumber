@@ -80,10 +80,14 @@ def a_log_as_of_20230626(ch: dict):
 
 def default_nexus_structure(instr: Union[Path, str], origin: str = None):
     """Create a default NeXus structure for the specified instrument using eniius"""
-    import eniius
     from .mccode import get_mcstas_instr
     instrument = get_mcstas_instr(instr)
-    nx = eniius.Eniius.from_mccode(instrument, origin=origin)
+    return default_nexus_structure_from_instr(instrument, origin=origin)
+
+
+def default_nexus_structure_from_instr(instr, origin: str | None = None):
+    import eniius
+    nx = eniius.Eniius.from_mccode(instr, origin=origin, only_nx=False)
     return nx.to_nexus_structure(absolute_depends_on=True, only_nx=False)
 
 
@@ -242,6 +246,10 @@ def parameter_description(inst_param):
 def construct_writer_pv_dicts(instr: Union[Path, str], prefix: str, topic: str):
     from .mccode import get_mccode_instr_parameters
     parameters = get_mccode_instr_parameters(instr)
+    return construct_writer_pv_dicts_from_parameters(parameters, prefix, topic)
+
+
+def construct_writer_pv_dicts_from_parameters(parameters, prefix: str, topic: str):
     return [dict(name=p.name, dtype=p.value.data_type.name, source=f'{prefix}{p.name}', topic=topic,
                  description=parameter_description(p), module='f144', unit=p.unit) for p in parameters]
 
