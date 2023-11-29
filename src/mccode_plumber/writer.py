@@ -83,12 +83,12 @@ def a_log_as_of_20230626(ch: dict):
 
 def default_nexus_structure(instr, origin: str | None = None):
     from zenlog import log
-    import eniius
+    import moreniius.additions  # patches the Instance class to have more translation methods
+    from moreniius import MorEniius
     log.info('Creating NeXus structure from instrument'
              ' -- no custom Instance to NeXus mapping is used'
-             ' -- provide a JSON object to use any custom mapping')
-    nx = eniius.Eniius.from_mccode(instr, origin=origin, only_nx=False)
-    return nx.to_nexus_structure(absolute_depends_on=True, only_nx=False)
+             ' -- provide a JSON object, a python module and function name, or executable to use a custom mapping')
+    return MorEniius.from_mccode(instr, origin=origin, only_nx=False, absolute_depends_on=True).to_nexus_structure()
 
 
 def add_pvs_to_nexus_structure(ns: dict, pvs: list[dict]):
