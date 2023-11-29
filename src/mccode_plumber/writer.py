@@ -142,16 +142,16 @@ def get_writer_pool(broker: str = None, job: str = None, command: str = None):
 
 
 def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str = None, event_stream: dict[str, str] = None,
-                           file: Union[Path, str, None] = None, func: Union[Callable[[Instr], dict], None] = None,
-                           binary: Union[Path, str, None] = None, origin: str = None):
+                           file: Union[Path, None] = None, func: Union[Callable[[Instr], dict], None] = None,
+                           binary: Union[Path, None] = None, origin: str = None):
     import json
     from .mccode import get_mcstas_instr
-    if file is not None:
+    if file is not None and file.exists():
         with open(file, 'r') as file:
             nexus_structure = json.load(file)
     elif func is not None:
         nexus_structure = func(get_mcstas_instr(instr))
-    elif binary is not None:
+    elif binary is not None and binary.exists():
         from subprocess import run, PIPE
         result = run([binary, str(instr)], stdout=PIPE, stderr=PIPE)
         if result.returncode != 0:
@@ -216,7 +216,7 @@ def get_arg_parser():
 
     def is_accessible(access_type):
         def checker(name: str | None | Path):
-            if name is None:
+            if name is None or name == '':
                 return None
             from os import access
             if not isinstance(name, Path):
@@ -279,10 +279,9 @@ def construct_writer_pv_dicts_from_parameters(parameters, prefix: str, topic: st
 def parse_writer_args():
     args = get_arg_parser().parse_args()
     params = construct_writer_pv_dicts(args.instrument, args.prefix, args.topic)
-    structure = define_nexus_structure(args.instrument, params, title=args.title, file=args.structure_file,
-                                       func=args.structure_func, binary=args.structure_exec,
-                                       event_stream={'source': args.event_source, 'topic': args.event_topic},
-                                       origin=args.origin)
+    structure = define_nexus_structure(args.instrument, params, title=args.title, origin=args.origin,
+                                       file=args.ns_file, func=args.ns_func, binary=args.ns_exec,
+                                       event_stream={'source': args.event_source, 'topic': args.event_topic})
     return args, params, structure
 
 
