@@ -9,7 +9,7 @@ dependencies = [
     'file-writer-control==1.3.0',
     'restage==0.1.17',
     'mccode-to-kafka @ git+https://github.com/g5t/mccode-to-kafka.git',
-    'moreniius==0.1.1',
+    'moreniius==0.1.2',
     'icecream',
 ]
 dynamic = ['version']
