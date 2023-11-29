@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Union
+from typing import Union, Callable
+from mccode_antlr.instr import Instr
 
 
 def _is_group(x, group):
@@ -78,15 +81,12 @@ def a_log_as_of_20230626(ch: dict):
     return dict(name=ch['name'], type='group', attributes=[attrs], children=[log_child, desc_child])
 
 
-def default_nexus_structure(instr: Union[Path, str], origin: str = None):
-    """Create a default NeXus structure for the specified instrument using eniius"""
-    from .mccode import get_mcstas_instr
-    instrument = get_mcstas_instr(instr)
-    return default_nexus_structure_from_instr(instrument, origin=origin)
-
-
-def default_nexus_structure_from_instr(instr, origin: str | None = None):
+def default_nexus_structure(instr, origin: str | None = None):
+    from zenlog import log
     import eniius
+    log.info('Creating NeXus structure from instrument'
+             ' -- no custom Instance to NeXus mapping is used'
+             ' -- provide a JSON object to use any custom mapping')
     nx = eniius.Eniius.from_mccode(instr, origin=origin, only_nx=False)
     return nx.to_nexus_structure(absolute_depends_on=True, only_nx=False)
 
@@ -142,13 +142,23 @@ def get_writer_pool(broker: str = None, job: str = None, command: str = None):
 
 
 def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str = None, event_stream: dict[str, str] = None,
-                           structure_file: Union[Path, str] = None, origin: str = None):
-    if structure_file is not None:
-        import json
-        with open(structure_file, 'r') as file:
+                           file: Union[Path, str, None] = None, func: Union[Callable[[Instr], dict], None] = None,
+                           binary: Union[Path, str, None] = None, origin: str = None):
+    import json
+    from .mccode import get_mcstas_instr
+    if file is not None:
+        with open(file, 'r') as file:
             nexus_structure = json.load(file)
+    elif func is not None:
+        nexus_structure = func(get_mcstas_instr(instr))
+    elif binary is not None:
+        from subprocess import run, PIPE
+        result = run([binary, str(instr)], stdout=PIPE, stderr=PIPE)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to execute {binary} {instr} due to error {result.stderr.decode()}")
+        nexus_structure = json.loads(result.stdout.decode())
     else:
-        nexus_structure = default_nexus_structure(instr, origin=origin)
+        nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
     nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
     nexus_structure = add_title_to_nexus_structure(nexus_structure, title)
     nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
@@ -202,19 +212,29 @@ def start_pool_writer(start_time_string, structure, filename=None,
 
 def get_arg_parser():
     from argparse import ArgumentParser
+    from os import R_OK as READABLE, X_OK as EXECUTABLE
 
-    def loadable(name):
-        if not len(name):
+    def is_accessible(access_type):
+        def checker(name: str | None | Path):
+            if name is None:
+                return None
+            from os import access
+            if not isinstance(name, Path):
+                name = Path(name).resolve()
+            if not name.exists():
+                raise RuntimeError(f'The specified filename {name} does not exist')
+            if not access(name, access_type):
+                raise RuntimeError(f'The specified filename {name} is not {access_type}')
+            return name
+        return checker
+
+    def is_callable(name: str | None):
+        if name is None:
             return None
-        from pathlib import Path
-        from os import access, R_OK
-        if not isinstance(name, Path):
-            name = Path(name).resolve()
-        if not name.exists():
-            raise RuntimeError(f'The specified filename {name} does not exist')
-        if not access(name, R_OK):
-            raise RuntimeError(f'The specified filename {name} is not readable')
-        return name
+        from importlib import import_module
+        module_name, func_name = name.split(':')
+        module = import_module(module_name)
+        return getattr(module, func_name)
 
     parser = ArgumentParser(description="Control writing Kafka stream(s) to a NeXus file")
     a = parser.add_argument
@@ -228,7 +248,9 @@ def get_arg_parser():
     a('--event-source', type=str)
     a('--event-topic', type=str)
     a('-f', '--filename', type=str, default=None)
-    a('--structure-file', type=loadable, default=None, help='Base NeXus structure, will be extended')
+    a('--ns-func', type=is_callable, default=None, help='Python module:function to produce NeXus structure')
+    a('--ns-file', type=is_accessible(READABLE), default=None, help='Base NeXus structure, will be extended')
+    a('--ns-exec', type=is_accessible(EXECUTABLE), default=None, help='Executable to produce NeXus structure')
     a('--start-time', type=str)
     a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
 
@@ -257,7 +279,8 @@ def construct_writer_pv_dicts_from_parameters(parameters, prefix: str, topic: st
 def parse_writer_args():
     args = get_arg_parser().parse_args()
     params = construct_writer_pv_dicts(args.instrument, args.prefix, args.topic)
-    structure = define_nexus_structure(args.instrument, params, title=args.title, structure_file=args.structure_file,
+    structure = define_nexus_structure(args.instrument, params, title=args.title, file=args.structure_file,
+                                       func=args.structure_func, binary=args.structure_exec,
                                        event_stream={'source': args.event_source, 'topic': args.event_topic},
                                        origin=args.origin)
     return args, params, structure

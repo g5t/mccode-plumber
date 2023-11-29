@@ -21,10 +21,10 @@ class WriterTestCase(unittest.TestCase):
 
     def test_parse(self):
         from mccode_plumber.writer import construct_writer_pv_dicts_from_parameters
-        from mccode_plumber.writer import default_nexus_structure_from_instr
+        from mccode_plumber.writer import default_nexus_structure
         params = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
         self.assertEqual(len(params), 0)
-        struct = default_nexus_structure_from_instr(self.instr)
+        struct = default_nexus_structure(self.instr)
 
         self.assertEqual(len(struct['children']), 1)
         self.assertEqual(struct['children'][0]['name'], 'entry')
