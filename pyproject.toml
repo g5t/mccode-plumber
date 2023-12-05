@@ -7,9 +7,9 @@ name = 'mccode-plumber'
 dependencies = [
     'p4p==4.1.11',
     'file-writer-control==1.3.0',
-    'restage==0.1.20',
+    'restage==0.1.21',
     'mccode-to-kafka @ git+https://github.com/g5t/mccode-to-kafka.git',
-    'moreniius==0.1.5',
+    'moreniius==0.1.6',
     'icecream',
 ]
 dynamic = ['version']
