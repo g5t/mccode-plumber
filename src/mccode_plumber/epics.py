@@ -37,12 +37,16 @@ def parse_instr_nt_values(instr: Union[Path, str]):
 class MailboxHandler:
     @staticmethod
     def put(pv, op):
+        from datetime import datetime, timezone
         val = op.value()
-        # logging.info("Assign %s = %s", op.name(), val)
-        # Notify any subscribers of the new value.
-        # Also set timeStamp with current system time.
-        # FIXME timestamp can not be wrapped because the pv tries to use an empty lambda?!
-        pv.post(val)  # pv.post(val, timestamp=time.time())
+
+        if pv.nt is None:
+            # Assume that this means wrap wasn't provided ...
+            pv.nt = NTScalar(val.type()['value'])
+            pv._wrap = pv.nt.wrap
+
+        # Notify any subscribers of the new value, adding the timestamp, so they know when it was set.
+        pv.post(val, timestamp=datetime.now(timezone.utc).timestamp())
         # Notify the client making this PUT operation that it has now completed
         op.done()
 
