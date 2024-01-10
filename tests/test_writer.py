@@ -45,6 +45,27 @@ class WriterTestCase(unittest.TestCase):
         self.assertEqual(hs00['config']['edge_type'], 'double')
 
 
+class WriterUnitsTestCase(unittest.TestCase):
+    def setUp(self):
+        from mccode_antlr.loader import parse_mcstas_instr
+        instr = f"""DEFINE INSTRUMENT with_logs(double a/"Hz", b/"m", int c, string d)
+        TRACE
+        COMPONENT origin = Arm() AT (0, 0, 0) ABSOLUTE
+        COMPONENT source = Source_simple() AT (0, 0, 1) RELATIVE PREVIOUS
+        COMPONENT sample = Arm() AT (0, 0, 80) RELATIVE source
+        END
+        """
+        self.instr = parse_mcstas_instr(instr)
+
+    def test_parse(self):
+        from mccode_plumber.writer import construct_writer_pv_dicts_from_parameters
+        from mccode_plumber.writer import default_nexus_structure
+        params = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
+        self.assertEqual(len(params), 4)
+        for p, x in zip(params, [('a', 'Hz'), ('b', 'm'), ('c', None), ('d', None)]):
+            self.assertEqual(p['name'], x[0])
+            self.assertEqual(p['unit'], x[1])
+
 
 if __name__ == '__main__':
     unittest.main()

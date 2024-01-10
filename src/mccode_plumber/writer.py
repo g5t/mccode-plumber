@@ -272,8 +272,10 @@ def construct_writer_pv_dicts(instr: Union[Path, str], prefix: str, topic: str):
 
 
 def construct_writer_pv_dicts_from_parameters(parameters, prefix: str, topic: str):
+    def strip_quotes(s):
+        return s[1:-1] if s is not None and len(s) > 2 and (s[0] == s[-1] == '"' or s[0] == s[-1] == "'") else s
     return [dict(name=p.name, dtype=p.value.data_type.name, source=f'{prefix}{p.name}', topic=topic,
-                 description=parameter_description(p), module='f144', unit=p.unit) for p in parameters]
+                 description=parameter_description(p), module='f144', unit=strip_quotes(p.unit)) for p in parameters]
 
 
 def parse_writer_args():
