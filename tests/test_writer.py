@@ -5,8 +5,9 @@ class WriterTestCase(unittest.TestCase):
     def setUp(self):
         from json import dumps
         from mccode_antlr.loader import parse_mcstas_instr
-        from mccode_to_kafka.writer import nexus_structure, edge
-        ns = nexus_structure(topic='monitor', shape=[edge(10, 0.5, 10.5, 't', 'usec', 'monitor')])
+        from mccode_to_kafka.writer import da00_dataarray_config, da00_variable_config
+        t = da00_variable_config(name='t', label='monitor', unit='usec', axes=['t'], shape=[10], data_type='float64')
+        ns = da00_dataarray_config(topic='monitor', source='mccode-to-kafka', variables=[t])
         instr = f"""DEFINE INSTRUMENT this_IS_NOT_BIFROST()
         TRACE
         COMPONENT origin = Arm() AT (0, 0, 0) ABSOLUTE
@@ -33,16 +34,13 @@ class WriterTestCase(unittest.TestCase):
         self.assertEqual(struct['children'][0]['children'][0]['children'][3]['name'], 'monitor')
         mon = struct['children'][0]['children'][0]['children'][3]
         self.assertEqual(len(mon['children']), 5)
-        idx = [i for i, ch in enumerate(mon['children']) if 'module' in ch and 'hs00' == ch['module']]
+        idx = [i for i, ch in enumerate(mon['children']) if 'module' in ch and 'da00' == ch['module']]
         self.assertEqual(len(idx), 1)
-        hs00 = mon['children'][idx[0]]
-        self.assertEqual(len(hs00.keys()), 2)  # Why does this have an attributes key?
-        self.assertEqual(hs00['module'], 'hs00')
-        self.assertEqual(hs00['config']['topic'], 'monitor')
-        self.assertEqual(hs00['config']['source'], 'mccode-to-kafka')
-        self.assertEqual(hs00['config']['data_type'], 'double')
-        self.assertEqual(hs00['config']['error_type'], 'double')
-        self.assertEqual(hs00['config']['edge_type'], 'double')
+        da00 = mon['children'][idx[0]]
+        self.assertEqual(len(da00.keys()), 2)  # Why does this have an attributes key?
+        self.assertEqual(da00['module'], 'da00')
+        self.assertEqual(da00['config']['topic'], 'monitor')
+        self.assertEqual(da00['config']['source'], 'mccode-to-kafka')
 
 
 class WriterUnitsTestCase(unittest.TestCase):
@@ -59,7 +57,6 @@ class WriterUnitsTestCase(unittest.TestCase):
 
     def test_parse(self):
         from mccode_plumber.writer import construct_writer_pv_dicts_from_parameters
-        from mccode_plumber.writer import default_nexus_structure
         params = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
         self.assertEqual(len(params), 4)
         for p, x in zip(params, [('a', 'Hz'), ('b', 'm'), ('c', None), ('d', None)]):
