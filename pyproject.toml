@@ -23,6 +23,7 @@ mp-forwarder-teardown = 'mccode_plumber.forwarder:teardown'
 mp-writer-from = 'mccode_plumber.writer:print_time'
 mp-writer-write = 'mccode_plumber.writer:start_writer'
 mp-register-topics = 'mccode_plumber.kafka:register_topics'
+mp-insert-hdf5-instr = 'mccode_plumber.mccode:insert'
 
 [tool.setuptools_scm]
 

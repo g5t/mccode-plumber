@@ -98,10 +98,12 @@ def add_pvs_to_nexus_structure(ns: dict, pvs: list[dict]):
     # # NXlogs isn't a NeXus base class ...
     # logs, entry['children'] = _get_or_add_group(entry['children'],  'logs', 'NXlogs')
     # So dump everything directly into 'children'
+    # but 'NXparameters' _does_ exist:
+    parameters, entry['children'] = _get_or_add_group(entry['children'], 'parameters', 'NXparameters')
     for pv in pvs:
         if any(x not in pv for x in ['name', 'dtype', 'source', 'topic', 'description', 'module', 'unit']):
             raise RuntimeError(f"PV {pv['name']} is missing one or more required keys")
-        entry['children'].append(a_log_as_of_20230626(pv))
+        parameters['children'].append(a_log_as_of_20230626(pv))
     return ns
 
 
@@ -161,7 +163,7 @@ def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str 
         nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
     nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
     nexus_structure = add_title_to_nexus_structure(nexus_structure, title)
-    nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
+    # nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
     return nexus_structure
 
 
@@ -212,30 +214,7 @@ def start_pool_writer(start_time_string, structure, filename=None,
 
 def get_arg_parser():
     from argparse import ArgumentParser
-    from os import R_OK as READABLE, X_OK as EXECUTABLE
-
-    def is_accessible(access_type):
-        def checker(name: str | None | Path):
-            if name is None or name == '':
-                return None
-            from os import access
-            if not isinstance(name, Path):
-                name = Path(name).resolve()
-            if not name.exists():
-                raise RuntimeError(f'The specified filename {name} does not exist')
-            if not access(name, access_type):
-                raise RuntimeError(f'The specified filename {name} is not {access_type}')
-            return name
-        return checker
-
-    def is_callable(name: str | None):
-        if name is None:
-            return None
-        from importlib import import_module
-        module_name, func_name = name.split(':')
-        module = import_module(module_name)
-        return getattr(module, func_name)
-
+    from .utils import is_callable, is_readable, is_executable
     parser = ArgumentParser(description="Control writing Kafka stream(s) to a NeXus file")
     a = parser.add_argument
     a('instrument', type=str, default=None, help="The mcstas instrument with EPICS PVs")
@@ -249,8 +228,8 @@ def get_arg_parser():
     a('--event-topic', type=str)
     a('-f', '--filename', type=str, default=None)
     a('--ns-func', type=is_callable, default=None, help='Python module:function to produce NeXus structure')
-    a('--ns-file', type=is_accessible(READABLE), default=None, help='Base NeXus structure, will be extended')
-    a('--ns-exec', type=is_accessible(EXECUTABLE), default=None, help='Executable to produce NeXus structure')
+    a('--ns-file', type=is_readable, default=None, help='Base NeXus structure, will be extended')
+    a('--ns-exec', type=is_executable, default=None, help='Executable to produce NeXus structure')
     a('--start-time', type=str)
     a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
 
