@@ -29,15 +29,18 @@ class WriterTestCase(unittest.TestCase):
         self.assertEqual(len(struct['children']), 1)
         self.assertEqual(struct['children'][0]['name'], 'entry')
         self.assertEqual(struct['children'][0]['children'][0]['name'], 'instrument')
-        self.assertEqual(struct['children'][0]['children'][0]['children'][1]['name'], 'origin')
-        self.assertEqual(struct['children'][0]['children'][0]['children'][2]['name'], 'source')
-        self.assertEqual(struct['children'][0]['children'][0]['children'][3]['name'], 'monitor')
+        self.assertEqual(struct['children'][0]['children'][0]['children'][1]['name'], '0_origin')
+        self.assertEqual(struct['children'][0]['children'][0]['children'][2]['name'], '1_source')
+        self.assertEqual(struct['children'][0]['children'][0]['children'][3]['name'], '2_monitor')
         mon = struct['children'][0]['children'][0]['children'][3]
-        self.assertEqual(len(mon['children']), 5)
-        idx = [i for i, ch in enumerate(mon['children']) if 'module' in ch and 'da00' == ch['module']]
+        self.assertEqual(len(mon['children']), 4)  # removed 'mccode' property 5->4
+        idx = [i for i, ch in enumerate(mon['children']) if 'name' in ch and 'data' == ch['name']]
+        self.assertTrue(len(idx), 1)
+        data = mon['children'][idx[0]]
+        idx = [i for i, ch in enumerate(data['children']) if 'module' in ch and 'da00' == ch['module']]
         self.assertEqual(len(idx), 1)
-        da00 = mon['children'][idx[0]]
-        self.assertEqual(len(da00.keys()), 2)  # Why does this have an attributes key?
+        da00 = data['children'][idx[0]]
+        self.assertEqual(len(da00.keys()), 2)
         self.assertEqual(da00['module'], 'da00')
         self.assertEqual(da00['config']['topic'], 'monitor')
         self.assertEqual(da00['config']['source'], 'mccode-to-kafka')
