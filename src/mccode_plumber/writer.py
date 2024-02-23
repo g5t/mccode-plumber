@@ -167,8 +167,9 @@ def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str 
     return nexus_structure
 
 
-def start_pool_writer(start_time_string, structure, filename=None,
-                      broker: str = None, job_topic: str = None, command_topic: str = None):
+def start_pool_writer(start_time_string, structure, filename=None, stop_time_string: str | None = None,
+                      broker: str | None = None, job_topic: str | None = None, command_topic: str | None = None,
+                      wait: bool = False):
     from time import sleep
     from json import dumps
     from datetime import datetime, timedelta
@@ -182,20 +183,22 @@ def start_pool_writer(start_time_string, structure, filename=None,
     handler_opts = {'worker_finder': pool}
 
     handler = JobHandler(**handler_opts)
-    # big_string = dumps(structure)
     small_string = dumps(structure, indent=None, separators=(',', ':'))
-    # print(f'Sending {len(small_string)} size structure instead of {len(big_string)} full-sized structure.')
-    end_time = datetime.now()
+
+    end_time = datetime.now() if wait else None
+    if stop_time_string is not None:
+        end_time = datetime.fromisoformat(stop_time_string)
     print(f"write file from {start_time} until {end_time}")
 
     job = WriteJob(small_string, filename, broker, start_time, end_time)
     # start the job
     start = handler.start_job(job)
-    # ensure the start succeeds:
-    timeout = 60
     try:
+        # ensure the start succeeds:
+        timeout = 60
+        zero_time = datetime.now()
         while not start.is_done():
-            if end_time + timedelta(seconds=timeout) < datetime.now():
+            if zero_time + timedelta(seconds=timeout) < datetime.now():
                 raise RuntimeError(f"Timed out while starting job {job.job_id}")
             elif start.get_state() == CommandState.ERROR:
                 raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
@@ -203,13 +206,15 @@ def start_pool_writer(start_time_string, structure, filename=None,
     except RuntimeError as e:
         raise RuntimeError(e.__str__() + f" The message was: {start.get_message()}")
 
-    try:
-        while not handler.is_done():
-            sleep(1)
-
-    except RuntimeError as error:
-        message = handler.get_message()
-        print(f'Writer failed, producing message:\n{message}')
+    if wait:
+        try:
+            while not handler.is_done():
+                sleep(1)
+        except RuntimeError as error:
+            message = handler.get_message()
+            print(f'Writer failed, producing message:\n{message}')
+    else:
+        print(job.job_id)
 
 
 def get_arg_parser():
@@ -231,7 +236,9 @@ def get_arg_parser():
     a('--ns-file', type=is_readable, default=None, help='Base NeXus structure, will be extended')
     a('--ns-exec', type=is_executable, default=None, help='Executable to produce NeXus structure')
     a('--start-time', type=str)
+    a('--stop-time',  type=str, default=None)
     a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
+    a('--wait', action='store_true', help='If provided, wait for the writer to finish before exiting')
 
     return parser
 
@@ -273,5 +280,39 @@ def print_time():
 
 def start_writer():
     args, parameters, structure = parse_writer_args()
-    start_pool_writer(args.start_time, structure, args.filename,
+    start_pool_writer(args.start_time, structure, args.filename, stop_time_string=args.stop_time,
                       broker=args.broker, job_topic=args.job, command_topic=args.command)
+
+
+def wait_on_writer():
+    from time import sleep
+    from datetime import datetime, timedelta
+    from file_writer_control import JobHandler, CommandState
+
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    a = parser.add_argument
+    a('-b', '--broker', type=str, help="The Kafka broker server used by the Writer")
+    a('-j', '--job', type=str, help='Writer job topic')
+    a('-c', '--command', type=str, help='Writer command topic')
+    a('id', type=str, help='Job id to wait on')
+    a('-s', '--stop-after', type=float, help='Stop after time, seconds', default=1)
+    a('-t', '--time-out', type=float, help='Time out after, seconds', default=24*60*60*30)
+    args = parser.parse_args()
+
+    pool = get_writer_pool(broker=args.broker, job=args.job, command=args.command)
+    job = JobHandler(worker_finder=pool, job_id=args.id)
+    stop_time = datetime.now() + timedelta(seconds=args.stop_after)
+    stop = job.set_stop_time(stop_time)
+
+    try:
+        timeout = 60
+        zero_time = datetime.now()
+        while not stop.is_done() and not job.is_done():
+            if zero_time + timedelta(seconds=timeout) < datetime.now():
+                raise RuntimeError(f"Timed out while stopping job {job.job_id}")
+            elif stop.get_state() == CommandState.ERROR:
+                raise RuntimeError(f"Stopping job {job.job_id} failed with message {stop.get_message()}")
+            sleep(0.5)
+    except RuntimeError as e:
+        raise RuntimeError(e.__str__() + f" The message was: {stop.get_message()}")
