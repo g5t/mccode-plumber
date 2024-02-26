@@ -169,7 +169,9 @@ def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str 
 
 def start_pool_writer(start_time_string, structure, filename=None, stop_time_string: str | None = None,
                       broker: str | None = None, job_topic: str | None = None, command_topic: str | None = None,
-                      wait: bool = False):
+                      wait: bool = False, timeout: float | None = None, job_id: str | None = None):
+    from sys import exit
+    from os import EX_OK, EX_UNAVAILABLE
     from time import sleep
     from json import dumps
     from datetime import datetime, timedelta
@@ -190,31 +192,32 @@ def start_pool_writer(start_time_string, structure, filename=None, stop_time_str
         end_time = datetime.fromisoformat(stop_time_string)
     print(f"write file from {start_time} until {end_time}")
 
-    job = WriteJob(small_string, filename, broker, start_time, end_time)
+    job = WriteJob(small_string, filename, broker, start_time, end_time, job_id=job_id or "")
     # start the job
     start = handler.start_job(job)
-    try:
-        # ensure the start succeeds:
-        timeout = 60
-        zero_time = datetime.now()
-        while not start.is_done():
-            if zero_time + timedelta(seconds=timeout) < datetime.now():
-                raise RuntimeError(f"Timed out while starting job {job.job_id}")
-            elif start.get_state() == CommandState.ERROR:
-                raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
-            sleep(0.5)
-    except RuntimeError as e:
-        raise RuntimeError(e.__str__() + f" The message was: {start.get_message()}")
+    if timeout is not None:
+        try:
+            # ensure the start succeeds:
+            zero_time = datetime.now()
+            while not start.is_done():
+                if zero_time + timedelta(seconds=timeout) < datetime.now():
+                    raise RuntimeError(f"Timed out while starting job {job.job_id}")
+                elif start.get_state() == CommandState.ERROR:
+                    raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
+                sleep(1)
+        except RuntimeError as e:
+            # raise RuntimeError(e.__str__() + f" The message was: {start.get_message()}")
+            print(f"{e} The message was: {start.get_message()}")
+            exit(EX_UNAVAILABLE)
 
     if wait:
         try:
             while not handler.is_done():
                 sleep(1)
         except RuntimeError as error:
-            message = handler.get_message()
-            print(f'Writer failed, producing message:\n{message}')
-    else:
-        print(job.job_id)
+            print(str(error) + f'Writer failed, producing message:\n{handler.get_message}')
+            exit(EX_UNAVAILABLE)
+    exit(EX_OK)
 
 
 def get_arg_parser():
@@ -239,6 +242,8 @@ def get_arg_parser():
     a('--stop-time',  type=str, default=None)
     a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
     a('--wait', action='store_true', help='If provided, wait for the writer to finish before exiting')
+    a('--time-out', type=float, default=120., help='Wait up to the timeout for writing to start')
+    a('--job-id', type=str, default=None, help='Unique Job identifier for this write-job')
 
     return parser
 
@@ -281,10 +286,13 @@ def print_time():
 def start_writer():
     args, parameters, structure = parse_writer_args()
     start_pool_writer(args.start_time, structure, args.filename, stop_time_string=args.stop_time,
-                      broker=args.broker, job_topic=args.job, command_topic=args.command)
+                      broker=args.broker, job_topic=args.job, command_topic=args.command,
+                      wait=args.wait, timeout=args.time_out, job_id=args.job_id)
 
 
 def wait_on_writer():
+    from sys import exit
+    from os import EX_OK, EX_UNAVAILABLE
     from time import sleep
     from datetime import datetime, timedelta
     from file_writer_control import JobHandler, CommandState
@@ -306,13 +314,17 @@ def wait_on_writer():
     stop = job.set_stop_time(stop_time)
 
     try:
-        timeout = 60
+        timeout = args.time_out
         zero_time = datetime.now()
         while not stop.is_done() and not job.is_done():
             if zero_time + timedelta(seconds=timeout) < datetime.now():
+                print('1')
                 raise RuntimeError(f"Timed out while stopping job {job.job_id}")
             elif stop.get_state() == CommandState.ERROR:
+                print('2')
                 raise RuntimeError(f"Stopping job {job.job_id} failed with message {stop.get_message()}")
             sleep(0.5)
     except RuntimeError as e:
-        raise RuntimeError(e.__str__() + f" The message was: {stop.get_message()}")
+        # raise RuntimeError(e.__str__() + f" The message was: {stop.get_message()}")
+        exit(EX_UNAVAILABLE)
+    exit(EX_OK)
