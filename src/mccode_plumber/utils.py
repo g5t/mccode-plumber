@@ -23,8 +23,20 @@ def is_readable(value: str | None | Path):
 
 
 def is_writable(value: str | None | Path):
+    """Determine if a provided path represents an existing writable file"""
     from os import W_OK
     return is_accessible(W_OK)(value)
+
+
+def is_creatable(value: str | None | Path):
+    """Determine if a provided path represents a file that can be created"""
+    if value is None or value == '':
+        return None
+    if not isinstance(value, Path):
+        value = Path(value).resolve()
+    if value.exists():
+        raise RuntimeError(f"The specified filename {value} already exists!")
+    return is_writable(value.parent)
 
 
 def is_appendable(value: str | None | Path):

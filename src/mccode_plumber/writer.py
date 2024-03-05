@@ -222,7 +222,7 @@ def start_pool_writer(start_time_string, structure, filename=None, stop_time_str
 
 def get_arg_parser():
     from argparse import ArgumentParser
-    from .utils import is_callable, is_readable, is_executable, is_writable
+    from .utils import is_callable, is_readable, is_executable, is_creatable
     parser = ArgumentParser(description="Control writing Kafka stream(s) to a NeXus file")
     a = parser.add_argument
     a('instrument', type=str, default=None, help="The mcstas instrument with EPICS PVs")
@@ -238,7 +238,7 @@ def get_arg_parser():
     a('--ns-func', type=is_callable, default=None, help='Python module:function to produce NeXus structure')
     a('--ns-file', type=is_readable, default=None, help='Base NeXus structure, will be extended')
     a('--ns-exec', type=is_executable, default=None, help='Executable to produce NeXus structure')
-    a('--ns-save', type=is_writable, default=None, help='Path at which to save extended NeXus structure')
+    a('--ns-save', type=is_creatable, default=None, help='Path at which to save extended NeXus structure')
     a('--start-time', type=str)
     a('--stop-time',  type=str, default=None)
     a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
