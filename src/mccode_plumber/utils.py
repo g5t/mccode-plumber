@@ -36,7 +36,7 @@ def is_creatable(value: str | None | Path):
         value = Path(value).resolve()
     if value.exists():
         raise RuntimeError(f"The specified filename {value} already exists!")
-    return is_writable(value.parent)
+    return value if is_writable(value.parent) else None
 
 
 def is_appendable(value: str | None | Path):
