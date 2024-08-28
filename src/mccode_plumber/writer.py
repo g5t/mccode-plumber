@@ -291,9 +291,9 @@ def print_time():
 
 def start_writer():
     args, parameters, structure = parse_writer_args()
-    start_pool_writer(args.start_time, structure, args.filename, stop_time_string=args.stop_time,
-                      broker=args.broker, job_topic=args.job, command_topic=args.command,
-                      wait=args.wait, timeout=args.time_out, job_id=args.job_id)
+    return start_pool_writer(args.start_time, structure, args.filename, stop_time_string=args.stop_time,
+                             broker=args.broker, job_topic=args.job, command_topic=args.command,
+                             wait=args.wait, timeout=args.time_out, job_id=args.job_id)
 
 
 def wait_on_writer():
