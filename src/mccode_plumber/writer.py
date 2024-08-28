@@ -98,10 +98,12 @@ def add_pvs_to_nexus_structure(ns: dict, pvs: list[dict]):
     # # NXlogs isn't a NeXus base class ...
     # logs, entry['children'] = _get_or_add_group(entry['children'],  'logs', 'NXlogs')
     # So dump everything directly into 'children'
+    # but 'NXparameters' _does_ exist:
+    parameters, entry['children'] = _get_or_add_group(entry['children'], 'parameters', 'NXparameters')
     for pv in pvs:
         if any(x not in pv for x in ['name', 'dtype', 'source', 'topic', 'description', 'module', 'unit']):
             raise RuntimeError(f"PV {pv['name']} is missing one or more required keys")
-        entry['children'].append(a_log_as_of_20230626(pv))
+        parameters['children'].append(a_log_as_of_20230626(pv))
     return ns
 
 
@@ -161,12 +163,15 @@ def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str 
         nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
     nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
     nexus_structure = add_title_to_nexus_structure(nexus_structure, title)
-    nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
+    # nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
     return nexus_structure
 
 
-def start_pool_writer(start_time_string, structure, filename=None,
-                      broker: str = None, job_topic: str = None, command_topic: str = None):
+def start_pool_writer(start_time_string, structure, filename=None, stop_time_string: str | None = None,
+                      broker: str | None = None, job_topic: str | None = None, command_topic: str | None = None,
+                      wait: bool = False, timeout: float | None = None, job_id: str | None = None):
+    from sys import exit
+    from os import EX_OK, EX_UNAVAILABLE
     from time import sleep
     from json import dumps
     from datetime import datetime, timedelta
@@ -180,62 +185,44 @@ def start_pool_writer(start_time_string, structure, filename=None,
     handler_opts = {'worker_finder': pool}
 
     handler = JobHandler(**handler_opts)
-    # big_string = dumps(structure)
     small_string = dumps(structure, indent=None, separators=(',', ':'))
-    # print(f'Sending {len(small_string)} size structure instead of {len(big_string)} full-sized structure.')
-    end_time = datetime.now()
+
+    end_time = datetime.now() if wait else None
+    if stop_time_string is not None:
+        end_time = datetime.fromisoformat(stop_time_string)
     print(f"write file from {start_time} until {end_time}")
 
-    job = WriteJob(small_string, filename, broker, start_time, end_time)
+    job = WriteJob(small_string, filename, broker, start_time, end_time, job_id=job_id or "")
     # start the job
     start = handler.start_job(job)
-    # ensure the start succeeds:
-    timeout = 60
-    try:
-        while not start.is_done():
-            if end_time + timedelta(seconds=timeout) < datetime.now():
-                raise RuntimeError(f"Timed out while starting job {job.job_id}")
-            elif start.get_state() == CommandState.ERROR:
-                raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
-            sleep(0.5)
-    except RuntimeError as e:
-        raise RuntimeError(e.__str__() + f" The message was: {start.get_message()}")
+    if timeout is not None:
+        try:
+            # ensure the start succeeds:
+            zero_time = datetime.now()
+            while not start.is_done():
+                if zero_time + timedelta(seconds=timeout) < datetime.now():
+                    raise RuntimeError(f"Timed out while starting job {job.job_id}")
+                elif start.get_state() == CommandState.ERROR:
+                    raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
+                sleep(1)
+        except RuntimeError as e:
+            # raise RuntimeError(e.__str__() + f" The message was: {start.get_message()}")
+            print(f"{e} The message was: {start.get_message()}")
+            exit(EX_UNAVAILABLE)
 
-    try:
-        while not handler.is_done():
-            sleep(1)
-
-    except RuntimeError as error:
-        message = handler.get_message()
-        print(f'Writer failed, producing message:\n{message}')
+    if wait:
+        try:
+            while not handler.is_done():
+                sleep(1)
+        except RuntimeError as error:
+            print(str(error) + f'Writer failed, producing message:\n{handler.get_message}')
+            exit(EX_UNAVAILABLE)
+    exit(EX_OK)
 
 
 def get_arg_parser():
     from argparse import ArgumentParser
-    from os import R_OK as READABLE, X_OK as EXECUTABLE
-
-    def is_accessible(access_type):
-        def checker(name: str | None | Path):
-            if name is None or name == '':
-                return None
-            from os import access
-            if not isinstance(name, Path):
-                name = Path(name).resolve()
-            if not name.exists():
-                raise RuntimeError(f'The specified filename {name} does not exist')
-            if not access(name, access_type):
-                raise RuntimeError(f'The specified filename {name} is not {access_type}')
-            return name
-        return checker
-
-    def is_callable(name: str | None):
-        if name is None:
-            return None
-        from importlib import import_module
-        module_name, func_name = name.split(':')
-        module = import_module(module_name)
-        return getattr(module, func_name)
-
+    from .utils import is_callable, is_readable, is_executable, is_creatable
     parser = ArgumentParser(description="Control writing Kafka stream(s) to a NeXus file")
     a = parser.add_argument
     a('instrument', type=str, default=None, help="The mcstas instrument with EPICS PVs")
@@ -249,10 +236,15 @@ def get_arg_parser():
     a('--event-topic', type=str)
     a('-f', '--filename', type=str, default=None)
     a('--ns-func', type=is_callable, default=None, help='Python module:function to produce NeXus structure')
-    a('--ns-file', type=is_accessible(READABLE), default=None, help='Base NeXus structure, will be extended')
-    a('--ns-exec', type=is_accessible(EXECUTABLE), default=None, help='Executable to produce NeXus structure')
+    a('--ns-file', type=is_readable, default=None, help='Base NeXus structure, will be extended')
+    a('--ns-exec', type=is_executable, default=None, help='Executable to produce NeXus structure')
+    a('--ns-save', type=is_creatable, default=None, help='Path at which to save extended NeXus structure')
     a('--start-time', type=str)
+    a('--stop-time',  type=str, default=None)
     a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
+    a('--wait', action='store_true', help='If provided, wait for the writer to finish before exiting')
+    a('--time-out', type=float, default=120., help='Wait up to the timeout for writing to start')
+    a('--job-id', type=str, default=None, help='Unique Job identifier for this write-job')
 
     return parser
 
@@ -284,6 +276,11 @@ def parse_writer_args():
     structure = define_nexus_structure(args.instrument, params, title=args.title, origin=args.origin,
                                        file=args.ns_file, func=args.ns_func, binary=args.ns_exec,
                                        event_stream={'source': args.event_source, 'topic': args.event_topic})
+    if args.ns_save is not None:
+        from json import dump
+        with open(args.ns_save, 'w') as file:
+            dump(structure, file, indent=2)
+
     return args, params, structure
 
 
@@ -294,5 +291,46 @@ def print_time():
 
 def start_writer():
     args, parameters, structure = parse_writer_args()
-    start_pool_writer(args.start_time, structure, args.filename,
-                      broker=args.broker, job_topic=args.job, command_topic=args.command)
+    return start_pool_writer(args.start_time, structure, args.filename, stop_time_string=args.stop_time,
+                             broker=args.broker, job_topic=args.job, command_topic=args.command,
+                             wait=args.wait, timeout=args.time_out, job_id=args.job_id)
+
+
+def wait_on_writer():
+    from sys import exit
+    from os import EX_OK, EX_UNAVAILABLE
+    from time import sleep
+    from datetime import datetime, timedelta
+    from file_writer_control import JobHandler, CommandState
+
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    a = parser.add_argument
+    a('-b', '--broker', type=str, help="The Kafka broker server used by the Writer")
+    a('-j', '--job', type=str, help='Writer job topic')
+    a('-c', '--command', type=str, help='Writer command topic')
+    a('id', type=str, help='Job id to wait on')
+    a('-s', '--stop-after', type=float, help='Stop after time, seconds', default=1)
+    a('-t', '--time-out', type=float, help='Time out after, seconds', default=24*60*60*30)
+    args = parser.parse_args()
+
+    pool = get_writer_pool(broker=args.broker, job=args.job, command=args.command)
+    job = JobHandler(worker_finder=pool, job_id=args.id)
+    stop_time = datetime.now() + timedelta(seconds=args.stop_after)
+    stop = job.set_stop_time(stop_time)
+
+    try:
+        timeout = args.time_out
+        zero_time = datetime.now()
+        while not stop.is_done() and not job.is_done():
+            if zero_time + timedelta(seconds=timeout) < datetime.now():
+                print('1')
+                raise RuntimeError(f"Timed out while stopping job {job.job_id}")
+            elif stop.get_state() == CommandState.ERROR:
+                print('2')
+                raise RuntimeError(f"Stopping job {job.job_id} failed with message {stop.get_message()}")
+            sleep(0.5)
+    except RuntimeError as e:
+        # raise RuntimeError(e.__str__() + f" The message was: {stop.get_message()}")
+        exit(EX_UNAVAILABLE)
+    exit(EX_OK)

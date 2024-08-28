@@ -3,6 +3,7 @@ def parse_kafka_topic_args():
     parser = ArgumentParser(description="Prepare the named Kafka broker to host one or more topics")
     parser.add_argument('-b', '--broker', type=str, help='The Kafka broker server to interact with')
     parser.add_argument('topic', nargs="+", type=str, help='The Kafka topic(s) to register')
+    parser.add_argument('-q', '--quiet', action='store_true', help='Quiet (positive) failure')
 
     args = parser.parse_args()
     return args
@@ -21,4 +22,6 @@ def register_topics():
             future.result()
             print(f"Topic {topic} created")
         except Exception as e:
-            print(f"Failed to create topic {topic}: {e}")
+            from confluent_kafka.error import KafkaError
+            if not (args.quiet and e.args[0] == KafkaError.TOPIC_ALREADY_EXISTS):
+                print(f"Failed to create topic {topic}: {e.args[0].str()}")

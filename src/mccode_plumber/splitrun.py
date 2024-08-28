@@ -4,6 +4,7 @@ from restage.splitrun import splitrun
 def make_parser():
     from restage.splitrun import make_splitrun_parser
     parser = make_splitrun_parser()
+    parser.prog = 'mp-splitrun'
     parser.add_argument('--broker', type=str, help='The Kafka broker to send monitors to', default=None)
     parser.add_argument('--source', type=str, help='The Kafka source name to use for monitors', default=None)
     return parser
@@ -69,6 +70,9 @@ def main():
                     minimum_particle_count=args.nmin[0] if args.nmin is not None else None,
                     maximum_particle_count=args.nmax[0] if args.nmax is not None else None,
                     dry_run=args.dryrun,
+                    parallel=args.parallel,
+                    gpu=args.gpu,
+                    process_count=args.process_count,
                     callback=callback,
                     callback_arguments=callback_args,
                     )
