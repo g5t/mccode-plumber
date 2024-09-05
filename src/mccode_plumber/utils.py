@@ -27,6 +27,14 @@ def is_readable(value: str | None | Path):
 def is_writable(value: str | None | Path):
     """Determine if a provided path represents an existing writable file"""
     from os import W_OK
+    if value is None or value == '':
+        return None
+    if not isinstance(value, Path):
+        value = Path(value).resolve()
+    # Typically we can create a new file if the containing folder is writable
+    if not value.exists():
+        return value if is_accessible(W_OK)(value.parent) else None
+    # And if the file exists we should check if we can overwrite it
     return is_accessible(W_OK)(value)
 
 
