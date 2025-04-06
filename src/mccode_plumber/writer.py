@@ -138,7 +138,7 @@ def insert_events_in_nexus_structure(ns: dict, config: dict):
 
 
 def get_writer_pool(broker: str = None, job: str = None, command: str = None):
-    from file_writer_control import WorkerJobPool
+    from .file_writer_control import WorkerJobPool
     pool = WorkerJobPool(f"{broker}/{job}", f"{broker}/{command}")
     return pool
 
@@ -175,7 +175,7 @@ def start_pool_writer(start_time_string, structure, filename=None, stop_time_str
     from time import sleep
     from json import dumps
     from datetime import datetime, timedelta
-    from file_writer_control import JobHandler, WriteJob, CommandState
+    from .file_writer_control import JobHandler, WriteJob, CommandState
 
     start_time = datetime.fromisoformat(start_time_string)
     if filename is None:
@@ -301,7 +301,7 @@ def wait_on_writer():
     from os import EX_OK, EX_UNAVAILABLE
     from time import sleep
     from datetime import datetime, timedelta
-    from file_writer_control import JobHandler, CommandState
+    from .file_writer_control import JobHandler, CommandState
 
     from argparse import ArgumentParser
     parser = ArgumentParser()
