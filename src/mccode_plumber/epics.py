@@ -72,6 +72,7 @@ def main(names: dict[str, NTScalar], prefix: str = None):
     for name, value in names.items():
         pv = SharedPV(initial=value, handler=MailboxHandler())
         provider.add(f'{prefix}{name}' if prefix else name, pv)
+        print(f'Add mailbox for {prefix}{name}')
         pvs.append(pv)
 
     print(f'Start mailbox server for {len(pvs)} PVs with prefix {prefix}')
@@ -101,20 +102,33 @@ def update():
     from argparse import ArgumentParser
     from p4p.client.thread import Context
     parser = ArgumentParser(description="Update the mailbox server with new values")
-    parser.add_argument('address', type=str, help='The mailbox address of the value to be updated')
-    parser.add_argument('value', type=str, help='The new value to be assigned to the mailbox')
+    parser.add_argument('address value', type=str, nargs='+', help='The mailbox address and value to be updated')
     args = parser.parse_args()
+    addresses_values = getattr(args, 'address value')
+
+    if len(addresses_values) == 0:
+        parser.print_help()
+        return
+
+    addresses = addresses_values[::2]
+    values = addresses_values[1::2]
+
+    if len(addresses_values) % 2:
+        print(f'Please provide address-value pairs. Provided {addresses=} {values=}')
 
     ctx = Context('pva')
-    pv = ctx.get(args.address, throw=False)
-    if isinstance(pv, float):
-        ctx.put(args.address, float(args.value))
-    elif isinstance(pv, int):
-        ctx.put(args.address, int(args.value))
-    elif isinstance(pv, str):
-        ctx.put(args.address, str(args.value))
-    else:
-        raise ValueError(f'Unknown type {type(pv)} (this is likely a vector that I can not handle yet?)')
+    for address, value in zip(addresses, values):
+        pv = ctx.get(address, throw=False)
+        if isinstance(pv, float):
+            ctx.put(address, float(value))
+        elif isinstance(pv, int):
+            ctx.put(address, int(value))
+        elif isinstance(pv, str):
+            ctx.put(address, str(value))
+        elif isinstance(pv, TimeoutError):
+            print(f'[Timeout] Failed to update {address} with {value} (Unknown to EPICS?)')
+        else:
+            raise ValueError(f'Address {address} has unknown type {type(pv)}')
 
     ctx.disconnect()
 
