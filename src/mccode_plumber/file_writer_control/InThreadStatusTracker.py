@@ -223,6 +223,6 @@ class InThreadStatusTracker:
             current_job.state = JobState.ERROR
         else:
             current_job.state = JobState.DONE
-            current_job.metadata = json.loads(stopped.metadata)
+            current_job.metadata = json.loads(stopped.metadata) if stopped.metadata is not None else None
         current_job.message = stopped.message
         self.known_workers[stopped.service_id].state = WorkerState.IDLE
