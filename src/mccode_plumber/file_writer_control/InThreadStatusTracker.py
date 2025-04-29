@@ -22,14 +22,14 @@ from streaming_data_types.status_x5f2 import FILE_IDENTIFIER as STAT_IDENTIFIER
 from streaming_data_types.status_x5f2 import StatusMessage
 from streaming_data_types.utils import get_schema
 
-from file_writer_control.CommandStatus import CommandState, CommandStatus
-from file_writer_control.JobStatus import JobState, JobStatus
-from file_writer_control.StateExtractor import (
+from .CommandStatus import CommandState, CommandStatus
+from .JobStatus import JobState, JobStatus
+from .StateExtractor import (
     extract_job_state_from_answer,
     extract_state_from_command_answer,
     extract_worker_state_from_status,
 )
-from file_writer_control.WorkerStatus import WorkerState, WorkerStatus
+from .WorkerStatus import WorkerState, WorkerStatus
 
 DEAD_ENTITY_TIME_LIMIT = timedelta(hours=1)
 

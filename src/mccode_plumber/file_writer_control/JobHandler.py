@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from file_writer_control.CommandHandler import CommandHandler
-from file_writer_control.JobStatus import JobState
-from file_writer_control.WorkerFinder import WorkerFinder
-from file_writer_control.WriteJob import WriteJob
+from .CommandHandler import CommandHandler
+from .JobStatus import JobState
+from .WorkerFinder import WorkerFinder
+from .WriteJob import WriteJob
 
 
 class JobHandler:
