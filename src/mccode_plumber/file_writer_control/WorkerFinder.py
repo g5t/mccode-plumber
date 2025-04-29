@@ -6,13 +6,13 @@ from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
 from streaming_data_types.run_stop_6s4t import serialise_6s4t as serialise_stop
 
-from file_writer_control.CommandChannel import CommandChannel
-from file_writer_control.CommandHandler import CommandHandler
-from file_writer_control.CommandStatus import CommandStatus
-from file_writer_control.JobStatus import JobState, JobStatus
-from file_writer_control.KafkaTopicUrl import KafkaTopicUrl
-from file_writer_control.WorkerStatus import WorkerStatus
-from file_writer_control.WriteJob import WriteJob
+from .CommandChannel import CommandChannel
+from .CommandHandler import CommandHandler
+from .CommandStatus import CommandStatus
+from .JobStatus import JobState, JobStatus
+from .KafkaTopicUrl import KafkaTopicUrl
+from .WorkerStatus import WorkerStatus
+from .WriteJob import WriteJob
 
 
 class WorkerFinderBase:

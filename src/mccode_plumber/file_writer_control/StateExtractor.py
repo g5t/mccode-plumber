@@ -8,9 +8,9 @@ from streaming_data_types.action_response_answ import (
 )
 from streaming_data_types.status_x5f2 import StatusMessage
 
-from file_writer_control.CommandStatus import CommandState
-from file_writer_control.JobStatus import JobState
-from file_writer_control.WorkerStatus import WorkerState
+from .CommandStatus import CommandState
+from .JobStatus import JobState
+from .WorkerStatus import WorkerState
 
 
 def extract_worker_state_from_status(status: StatusMessage) -> WorkerState:

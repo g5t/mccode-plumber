@@ -1,7 +1,7 @@
 from datetime import timedelta
 
-from file_writer_control.CommandChannel import CommandChannel
-from file_writer_control.CommandStatus import CommandState
+from .CommandChannel import CommandChannel
+from .CommandStatus import CommandState
 
 
 class CommandHandler:

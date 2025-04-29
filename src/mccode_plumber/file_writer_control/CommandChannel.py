@@ -7,14 +7,14 @@ from typing import Dict, List, Optional, Union
 from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable
 
-from file_writer_control.CommandStatus import CommandState, CommandStatus
-from file_writer_control.InThreadStatusTracker import (
+from .CommandStatus import CommandState, CommandStatus
+from .InThreadStatusTracker import (
     DEAD_ENTITY_TIME_LIMIT,
     InThreadStatusTracker,
 )
-from file_writer_control.JobStatus import JobStatus
-from file_writer_control.KafkaTopicUrl import KafkaTopicUrl
-from file_writer_control.WorkerStatus import WorkerStatus
+from .JobStatus import JobStatus
+from .KafkaTopicUrl import KafkaTopicUrl
+from .WorkerStatus import WorkerStatus
 
 
 def thread_function(
