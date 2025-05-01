@@ -355,7 +355,7 @@ def kill_job():
     time.sleep(args.sleep)
     pool.try_send_stop_now(args.service_id, args.job_id)
 
-
+    
 def print_columns(titles: list | tuple, values: list[list | tuple] | tuple[list | tuple, ...]):
     if not len(values) or not len(titles):
         return
