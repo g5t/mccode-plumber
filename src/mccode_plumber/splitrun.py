@@ -4,18 +4,21 @@ def make_parser():
     parser.prog = 'mp-splitrun'
     parser.add_argument('--broker', type=str, help='The Kafka broker to send monitors to', default=None)
     parser.add_argument('--source', type=str, help='The Kafka source name to use for monitors', default=None)
+    parser.add_argument('--topic', type=str, help='The Kafka topic name(s) to use for monitors', default=None, action='append')
     return parser
 
 
-def monitors_to_kafka_callback_with_arguments(broker: str, source: str):
-    from functools import partial
+def monitors_to_kafka_callback_with_arguments(broker: str, source: str, topics: list[str]):
     from mccode_to_kafka.sender import send_histograms
+
+    partial_kwargs = {'broker': broker, 'source': source}
+    if len(topics) > 0:
+        partial_kwargs['topics'] = topics
 
     def callback(*args, **kwargs):
         print(f'monitors to kafka callback called with {args} and {kwargs}')
-        return send_histograms(*args, broker=broker, source=source, **kwargs)
+        return send_histograms(*args, **partial_kwargs, **kwargs)
 
-    # return partial(send_histograms, broker=broker, source=source), {'dir': 'root'}
     return callback, {'dir': 'root'}
 
 
@@ -24,5 +27,5 @@ def main():
     from restage.splitrun import splitrun_args, parse_splitrun
     args, parameters, precision = parse_splitrun(make_parser())
     instr = get_mcstas_instr(args.instrument[0])
-    callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker, args.source)
+    callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker, args.source, args.topic)
     return splitrun_args(instr, parameters, precision, args, callback=callback, callback_arguments=callback_args)
