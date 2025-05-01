@@ -12,11 +12,10 @@ def monitors_to_kafka_callback_with_arguments(broker: str, source: str, topics: 
     from mccode_to_kafka.sender import send_histograms
 
     partial_kwargs = {'broker': broker, 'source': source}
-    if len(topics) > 0:
-        partial_kwargs['topics'] = topics
+    if topics is not None and len(topics) > 0:
+        partial_kwargs['names'] = topics
 
     def callback(*args, **kwargs):
-        print(f'monitors to kafka callback called with {args} and {kwargs}')
         return send_histograms(*args, **partial_kwargs, **kwargs)
 
     return callback, {'dir': 'root'}
