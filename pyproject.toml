@@ -33,6 +33,7 @@ mp-writer-write = 'mccode_plumber.writer:start_writer'
 mp-writer-wait = 'mccode_plumber.writer:wait_on_writer'
 mp-writer-list = 'mccode_plumber.writer:list_status'
 mp-writer-kill = 'mccode_plumber.writer:kill_job'
+mp-writer-killall = 'mccode_plumber.writer:kill_all'
 mp-register-topics = 'mccode_plumber.kafka:register_topics'
 mp-insert-hdf5-instr = 'mccode_plumber.mccode:insert'
 
