@@ -1,9 +1,11 @@
 def parse_kafka_topic_args():
     from argparse import ArgumentParser
+    from mccode_plumber import __version__
     parser = ArgumentParser(description="Prepare the named Kafka broker to host one or more topics")
     parser.add_argument('-b', '--broker', type=str, help='The Kafka broker server to interact with')
     parser.add_argument('topic', nargs="+", type=str, help='The Kafka topic(s) to register')
     parser.add_argument('-q', '--quiet', action='store_true', help='Quiet (positive) failure')
+    parser.add_argument('-v', '--version', action='version', version=__version__)
 
     args = parser.parse_args()
     return args

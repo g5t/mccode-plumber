@@ -1,15 +1,13 @@
 from pathlib import Path
 from typing import Union
-from mccode_antlr.instr import Instr
-from mccode_antlr.common import InstrumentParameter
 
 
-def get_mcstas_instr(filename: Union[Path, str]) -> Instr:
+def get_mcstas_instr(filename: Union[Path, str]):
     from restage.instr import load_instr
     return load_instr(filename)
 
 
-def get_mccode_instr_parameters(filename: Union[Path, str]) -> tuple[InstrumentParameter]:
+def get_mccode_instr_parameters(filename: Union[Path, str]):
     from mccode_antlr.loader.loader import parse_mccode_instr_parameters
     if not isinstance(filename, Path):
         filename = Path(filename)
@@ -42,12 +40,14 @@ def insert_mcstas_hdf5(filename: Union[Path, str], outfile: Union[Path, str], pa
 
 def get_arg_parser():
     from argparse import ArgumentParser
+    from mccode_plumber import __version__
     from .utils import is_readable, is_appendable
     parser = ArgumentParser(description="Copy a Instr HDF5 representation to a NeXus HDF5 file")
     a = parser.add_argument
     a('instrument', type=is_readable, default=None, help="The mcstas instrument file")
     a('-p', '--parent', type=str, default='mcstas')
     a('-o', '--outfile', type=is_appendable, default=None, help='Base NeXus structure, will be extended')
+    a('-v', '--version', action='version', version=__version__)
     return parser
 
 

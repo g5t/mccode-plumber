@@ -62,12 +62,14 @@ def reset_forwarder(pvs: list[dict], config=None, prefix=None, topic=None):
 def parse_registrar_args():
     from argparse import ArgumentParser
     from .mccode import get_mccode_instr_parameters
+    from mccode_plumber import __version__
 
     parser = ArgumentParser(description="Discover EPICS PVs and inform a forwarder about them")
     parser.add_argument('-p', '--prefix', type=str, default='mcstas:')
     parser.add_argument('instrument', type=str, help="The mcstas instrument with EPICS PVs")
     parser.add_argument('-c', '--config', type=str, help="The Kafka server and topic for configuring the Forwarder")
     parser.add_argument('-t', '--topic', type=str, help="The Kafka topic to instruct the Forwarder to send data to")
+    parser.add_argument('-v', '--version', action='version', version=__version__)
 
     args = parser.parse_args()
     parameter_names = [p.name for p in get_mccode_instr_parameters(args.instrument)]

@@ -53,9 +53,11 @@ class MailboxHandler:
 
 def get_parser():
     from argparse import ArgumentParser
+    from mccode_plumber import __version__
     p = ArgumentParser()
     p.add_argument('instr', type=str, help='The instrument file to read')
     p.add_argument('-p', '--prefix', type=str, help='The EPICS PV prefix to use', default='mcstas:')
+    p.add_argument('-v', '--version', action='version', version=__version__)
     return p
 
 
