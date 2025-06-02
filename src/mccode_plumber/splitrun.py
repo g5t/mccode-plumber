@@ -1,10 +1,12 @@
 def make_parser():
+    from mccode_plumber import __version__
     from restage.splitrun import make_splitrun_parser
     parser = make_splitrun_parser()
     parser.prog = 'mp-splitrun'
     parser.add_argument('--broker', type=str, help='The Kafka broker to send monitors to', default=None)
     parser.add_argument('--source', type=str, help='The Kafka source name to use for monitors', default=None)
     parser.add_argument('--topic', type=str, help='The Kafka topic name(s) to use for monitors', default=None, action='append')
+    parser.add_argument('-v', '--version', action='version', version=__version__)
     return parser
 
 

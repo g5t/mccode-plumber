@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union, Callable
-from mccode_antlr.instr import Instr
 
 from .file_writer_control import WorkerJobPool
 
@@ -145,28 +143,39 @@ def get_writer_pool(broker: str = None, job: str = None, command: str = None):
     return pool
 
 
-def define_nexus_structure(instr: Union[Path, str], pvs: list[dict], title: str = None, event_stream: dict[str, str] = None,
-                           file: Union[Path, None] = None, func: Union[Callable[[Instr], dict], None] = None,
-                           binary: Union[Path, None] = None, origin: str = None):
-    import json
-    from .mccode import get_mcstas_instr
-    if file is not None and file.exists():
-        with open(file, 'r') as file:
-            nexus_structure = json.load(file)
-    elif func is not None:
-        nexus_structure = func(get_mcstas_instr(instr))
-    elif binary is not None and binary.exists():
-        from subprocess import run, PIPE
-        result = run([binary, str(instr)], stdout=PIPE, stderr=PIPE)
-        if result.returncode != 0:
-            raise RuntimeError(f"Failed to execute {binary} {instr} due to error {result.stderr.decode()}")
-        nexus_structure = json.loads(result.stdout.decode())
-    else:
-        nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
-    nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
-    nexus_structure = add_title_to_nexus_structure(nexus_structure, title)
-    # nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
-    return nexus_structure
+def make_define_nexus_structure():
+    from typing import Union, Callable
+    from mccode_antlr.instr import Instr
+
+    def define_nexus_structure(
+            instr: Union[Path, str],
+            pvs: list[dict],
+            title: str = None,
+            event_stream: dict[str, str] = None,
+            file: Union[Path, None] = None,
+            func: Union[Callable[[Instr], dict], None] = None,
+            binary: Union[Path, None] = None,
+            origin: str = None):
+        import json
+        from .mccode import get_mcstas_instr
+        if file is not None and file.exists():
+            with open(file, 'r') as file:
+                nexus_structure = json.load(file)
+        elif func is not None:
+            nexus_structure = func(get_mcstas_instr(instr))
+        elif binary is not None and binary.exists():
+            from subprocess import run, PIPE
+            result = run([binary, str(instr)], stdout=PIPE, stderr=PIPE)
+            if result.returncode != 0:
+                raise RuntimeError(f"Failed to execute {binary} {instr} due to error {result.stderr.decode()}")
+            nexus_structure = json.loads(result.stdout.decode())
+        else:
+            nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
+        nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
+        nexus_structure = add_title_to_nexus_structure(nexus_structure, title)
+        # nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
+        return nexus_structure
+    return define_nexus_structure
 
 
 def start_pool_writer(start_time_string, structure, filename=None, stop_time_string: str | None = None,
@@ -224,6 +233,7 @@ def start_pool_writer(start_time_string, structure, filename=None, stop_time_str
 
 def get_arg_parser():
     from argparse import ArgumentParser
+    from mccode_plumber import __version__
     from .utils import is_callable, is_readable, is_executable, is_writable
     parser = ArgumentParser(description="Control writing Kafka stream(s) to a NeXus file")
     a = parser.add_argument
@@ -247,6 +257,7 @@ def get_arg_parser():
     a('--wait', action='store_true', help='If provided, wait for the writer to finish before exiting')
     a('--time-out', type=float, default=120., help='Wait up to the timeout for writing to start')
     a('--job-id', type=str, default=None, help='Unique Job identifier for this write-job')
+    a('-v', '--version', action='version', version=__version__)
 
     return parser
 
@@ -275,9 +286,12 @@ def construct_writer_pv_dicts_from_parameters(parameters, prefix: str, topic: st
 def parse_writer_args():
     args = get_arg_parser().parse_args()
     params = construct_writer_pv_dicts(args.instrument, args.prefix, args.topic)
-    structure = define_nexus_structure(args.instrument, params, title=args.title, origin=args.origin,
-                                       file=args.ns_file, func=args.ns_func, binary=args.ns_exec,
-                                       event_stream={'source': args.event_source, 'topic': args.event_topic})
+    define_nexus_structure = make_define_nexus_structure()
+    structure = define_nexus_structure(
+        args.instrument, params, title=args.title, origin=args.origin,
+        file=args.ns_file, func=args.ns_func, binary=args.ns_exec,
+        event_stream={'source': args.event_source, 'topic': args.event_topic}
+    )
     if args.ns_save is not None:
         from json import dump
         with open(args.ns_save, 'w') as file:
@@ -303,6 +317,7 @@ def wait_on_writer():
     from os import EX_OK, EX_UNAVAILABLE
     from time import sleep
     from datetime import datetime, timedelta
+    from mccode_plumber import __version__
     from .file_writer_control import JobHandler, CommandState
 
     from argparse import ArgumentParser
@@ -314,6 +329,7 @@ def wait_on_writer():
     a('id', type=str, help='Job id to wait on')
     a('-s', '--stop-after', type=float, help='Stop after time, seconds', default=1)
     a('-t', '--time-out', type=float, help='Time out after, seconds', default=24*60*60*30)
+    a('-v', '--version', action='version', version=__version__)
     args = parser.parse_args()
 
     pool = get_writer_pool(broker=args.broker, job=args.job, command=args.command)
@@ -338,18 +354,25 @@ def wait_on_writer():
     exit(EX_OK)
 
 
+def kill_list_parser():
+    from argparse import ArgumentParser
+    from mccode_plumber import __version__
+    parser = ArgumentParser()
+    a = parser.add_argument
+    a('-b', '--broker', help="Kafka broker", default='localhost:9092', type=str)
+    a('-c', '--command', help="Writer command topic", default="WriterCommand", type=str)
+    a('-t', '--topic', help='Writer job topic', default='WriterJobs', type=str)
+    a('-s', '--sleep', help='Post pool creation sleep time (s)', default=1, type=int)
+    a('-v', '--version', action='version', version=__version__)
+    return parser
+
+
 def kill_job():
     import time
-    from argparse import ArgumentParser
     from .file_writer_control import WorkerJobPool
-    parser = ArgumentParser()
-    parser.add_argument('-b', '--broker', help="Kafka broker", default='localhost:9092', type=str)
-    parser.add_argument('-c', '--command', help="Writer command topic", default="WriterCommand", type=str)
-    parser.add_argument('-t', '--topic', help='Writer job topic', default='WriterJobs', type=str)
-    parser.add_argument('-s', '--sleep', help='Post pool creation sleep time (s)', default=1, type=int)
+    parser = kill_list_parser()
     parser.add_argument('service_id', type=str, help='Writer service id to stop')
     parser.add_argument('job_id', type=str, help='Writer job id to stop')
-
     args = parser.parse_args()
     pool = WorkerJobPool(f'{args.broker}/{args.topic}', f'{args.broker}/{args.command}')
     time.sleep(args.sleep)
@@ -411,15 +434,9 @@ def print_current_state(channel: WorkerJobPool):
 
 def kill_all():
     import time
-    from argparse import ArgumentParser
     from .file_writer_control import WorkerJobPool
-    parser = ArgumentParser()
-    parser.add_argument('-b', '--broker', help="Kafka broker", default='localhost:9092', type=str)
-    parser.add_argument('-c', '--command', help="Writer command topic", default="WriterCommand", type=str)
-    parser.add_argument('-t', '--topic', help='Writer job topic', default='WriterJobs', type=str)
-    parser.add_argument('-s', '--sleep', help='Post pool creation sleep time (s)', default=1, type=int)
-    parser.add_argument('-v', '--verbose', help='Verbose output', action='store_true')
-
+    parser = kill_list_parser()
+    parser.add_argument('--verbose', help='Verbose output', action='store_true')
     args = parser.parse_args()
     pool = WorkerJobPool(f'{args.broker}/{args.topic}', f'{args.broker}/{args.command}')
     time.sleep(args.sleep)
@@ -439,12 +456,7 @@ def kill_all():
 
 def list_status():
     import time
-    from argparse import ArgumentParser
-    parser = ArgumentParser()
-    parser.add_argument('-b', '--broker', help="Kafka broker", default='localhost:9092', type=str)
-    parser.add_argument('-c', '--command', help="Writer command topic", default="WriterCommand", type=str)
-    parser.add_argument('-t', '--topic', help='Writer job topic', default='WriterJobs', type=str)
-    parser.add_argument('-s', '--sleep', type=int, help='Post pool creation sleep time', default=1)
+    parser = kill_list_parser()
     args = parser.parse_args()
     pool = WorkerJobPool(f'{args.broker}/{args.topic}', f'{args.broker}/{args.command}')
     time.sleep(args.sleep)
