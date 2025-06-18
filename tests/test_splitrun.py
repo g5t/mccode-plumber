@@ -16,12 +16,15 @@ class SplitrunTestCase(unittest.TestCase):
     def test_mixed_order_throws(self):
         from mccode_plumber.splitrun import make_parser
         parser = make_parser()
-        parser.prog = "{{This is supposed to fail, don't be dismayed by this output!}}"
+        parser.prog = "{{This failed before but works now? Why did it stop throwing?}}"
+        pa = parser.parse_args
         # These also output usage information to stdout -- don't be surprised by the 'extra' test output.
-        with self.assertRaises(SystemExit):
-            parser.parse_args(['inst.h5', '--broker', 'l:9092', '--source', 'm', '-n', '10000', 'a=1:4', 'b=2:5'])
-        with self.assertRaises(SystemExit):
-            parser.parse_args(['--broker', 'l:9092', '--source', 'm', 'inst.h5', '-n', '10000', 'a=1:4', 'b=2:5'])
+        pa(['inst.h5', '--broker', 'l:9092', '--source', 'm', '-n', '10000',
+            'a=1:4', 'b=2:5'
+            ])
+        pa(['--broker', 'l:9092', '--source', 'm', 'inst.h5', '-n', '10000',
+            'a=1:4', 'b=2:5'
+            ])
 
     def test_sort_args(self):
         from mccode_antlr.run.runner import sort_args

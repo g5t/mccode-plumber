@@ -6,11 +6,11 @@ build-backend = 'setuptools.build_meta'
 name = 'mccode-plumber'
 dependencies = [
     'p4p',
-    'kafka-python>=2.0',
+    'kafka-python>=2.2.11',
     'ess-streaming-data-types>=0.14.0',
-    'restage>=0.5.0',
+    'restage>=0.6.0',
     'mccode-to-kafka>=0.2.2',
-    'moreniius>=0.2.3',
+    'moreniius>=0.3.0',
     'icecream',
 ]
 readme = "README.md"
