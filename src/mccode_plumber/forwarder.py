@@ -31,30 +31,30 @@ def normalise_pvs(pvs: list[dict], config=None, prefix=None, topic=None):
 
 
 def streams(pvs: list[dict]):
-    from streaming_data_types.forwarder_config_update_rf5k import StreamInfo, Protocol
-    return [StreamInfo(pv['source'], pv['module'], pv['topic'], Protocol.Protocol.PVA) for pv in pvs]
+    from streaming_data_types.forwarder_config_update_fc00 import StreamInfo, Protocol
+    return [StreamInfo(pv['source'], pv['module'], pv['topic'], Protocol.Protocol.PVA, periodic=False) for pv in pvs]
 
 
 def configure_forwarder(pvs: list[dict], config=None, prefix=None, topic=None):
     from confluent_kafka import Producer
-    from streaming_data_types.forwarder_config_update_rf5k import serialise_rf5k, StreamInfo, Protocol
-    from streaming_data_types.fbschemas.forwarder_config_update_rf5k.UpdateType import UpdateType
+    from streaming_data_types.forwarder_config_update_fc00 import serialise_fc00 as serialise
+    from streaming_data_types.fbschemas.forwarder_config_update_fc00.UpdateType import UpdateType
 
     cfg_broker, cfg_topic, pvs = normalise_pvs(pvs, config, prefix, topic)
     producer = Producer({"bootstrap.servers": cfg_broker})
-    producer.produce(cfg_topic, serialise_rf5k(UpdateType.ADD, streams(pvs)))
+    producer.produce(cfg_topic, serialise(UpdateType.ADD, streams(pvs)))
     producer.flush()
     return pvs
 
 
 def reset_forwarder(pvs: list[dict], config=None, prefix=None, topic=None):
     from confluent_kafka import Producer
-    from streaming_data_types.forwarder_config_update_rf5k import serialise_rf5k
-    from streaming_data_types.fbschemas.forwarder_config_update_rf5k.UpdateType import UpdateType
+    from streaming_data_types.forwarder_config_update_fc00 import serialise_fc00 as serialise
+    from streaming_data_types.fbschemas.forwarder_config_update_fc00.UpdateType import UpdateType
 
     cfg_broker, cfg_topic, pvs = normalise_pvs(pvs, config, prefix, topic)
     producer = Producer({"bootstrap.servers": cfg_broker})
-    producer.produce(cfg_topic, serialise_rf5k(UpdateType.REMOVE, streams(pvs)))
+    producer.produce(cfg_topic, serialise(UpdateType.REMOVE, streams(pvs)))
     producer.flush()
     return pvs
 
