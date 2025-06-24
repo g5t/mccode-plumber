@@ -74,7 +74,6 @@ def main(names: dict[str, NTScalar], prefix: str = None):
     for name, value in names.items():
         pv = SharedPV(initial=value, handler=MailboxHandler())
         provider.add(f'{prefix}{name}' if prefix else name, pv)
-        print(f'Add mailbox for {prefix}{name}')
         pvs.append(pv)
 
     print(f'Start mailbox server for {len(pvs)} PVs with prefix {prefix}')

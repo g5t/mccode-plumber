@@ -12,6 +12,7 @@ dependencies = [
     'mccode-to-kafka>=0.2.2',
     'moreniius>=0.4.0',
     'icecream',
+    'ephemeral-port-reserve',
 ]
 readme = "README.md"
 authors = [
