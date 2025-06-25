@@ -67,8 +67,11 @@ def parse_args():
     return parameters, args
 
 
-def main(names: dict[str, NTScalar], prefix: str = None):
+def main(names: dict[str, NTScalar], prefix: str = None, filename_required: bool = True):
     provider = StaticProvider('mailbox')  # 'mailbox' is an arbitrary name
+
+    if filename_required and 'mcpl_filename' not in names:
+        names['mcpl_filename'] = NTScalar('s').wrap('')
 
     pvs = []  # we must keep a reference in order to keep the Handler from being collected
     for name, value in names.items():
