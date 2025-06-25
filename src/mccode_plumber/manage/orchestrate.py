@@ -2,28 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 from mccode_antlr.instr import Instr
-
+from mccode_plumber.manage.manager import ensure_readable_file, ensure_executable
 
 def guess_instr_config(name: str):
-    from os import access, R_OK
     guess = f'/event-formation-unit/configs/{name}/configs/{name}.json'
-    if access(guess, R_OK):
-        return guess
-    raise FileNotFoundError(f'Could not find {guess} in {name}')
+    return ensure_readable_file(Path(guess))
 
 def guess_instr_calibration(name: str):
-    from os import access, R_OK
     guess = f'/event-formation-unit/configs/{name}/configs/{name}nullcalib.json'
-    if access(guess, R_OK):
-        return guess
-    raise FileNotFoundError(f'Could not find {guess} in {name}')
+    return ensure_readable_file(Path(guess))
 
 def guess_instr_efu(name: str):
-    from os import access, X_OK
     guess = name.split('_')[0].split('.')[0].split('-')[0].lower()
-    if access(guess, X_OK):
-        return guess
-    raise FileNotFoundError(f'Could not find {guess} in {name}')
+    return ensure_executable(Path(guess))
 
 
 def register_topics(broker: str, topics: list[str]):

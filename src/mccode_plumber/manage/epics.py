@@ -31,7 +31,7 @@ class EPICSMailbox(Manager):
         from mccode_plumber.epics import main
         names = cls.fieldnames()
         kwargs = {k: config[k] for k in names if k in config}
-        obj = cls(**kwargs)
+        obj = cls(**kwargs, _process=None)
         obj._process = Process(target=main, args=(obj.values, obj.prefix))
         obj._process.start()
         return obj

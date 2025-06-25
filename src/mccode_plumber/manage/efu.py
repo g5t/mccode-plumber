@@ -1,6 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from ephemeral_port_reserve import reserve
 from mccode_plumber.manage.manager import Manager, ensure_readable_file, ensure_executable
 
 @dataclass
@@ -28,7 +29,7 @@ class EventFormationUnit(Manager):
     topic: str | None = None
     samples_topic: str | None = None
     port: int = 9000
-    command: int | None = None
+    command: int = field(default_factory=reserve)
     monitor_every: int = 1000
     monitor_consecutive: int = 2
 
@@ -44,9 +45,6 @@ class EventFormationUnit(Manager):
             self.samples_topic = f'{self.topic}_samples'
 
     def __run_command__(self):
-        from ephemeral_port_reserve import reserve
-        if self.command is None:
-            self.command = reserve()
         argv = [self.binary,
                 '-b', self.broker,
                 '-t', self.topic,
@@ -62,14 +60,18 @@ class EventFormationUnit(Manager):
 
     def finalize(self):
         import socket
+        message = f"Check your system status manager whether {self.binary} is active."
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             try:
+                sock.settimeout(1.0)
                 sock.connect(('localhost', self.command))
                 sock.sendall(bytes("EXIT\n", "utf-8"))
                 received = str(sock.recv(1024), "utf-8")
+            except TimeoutError:
+                print(f"Communication timed out, is the EFU running? {message}")
+                return
             except ConnectionRefusedError:
                 # the server is already dead or was not started?
                 received = '<OK>'
-        if received != "<OK>":
-            print(
-                f"EFU responded with {received} when asked to exit. Check your system status manager whether it exited")
+        if received.strip() != "<OK>":
+            print(f"EFU responded '{received.strip()}' when asked to exit. {message}")
