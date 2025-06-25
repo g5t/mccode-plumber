@@ -4,7 +4,7 @@ from mccode_plumber.manage.manager import Manager, ensure_path
 
 
 @dataclass
-class ForwarderManager(Manager):
+class Forwarder(Manager):
     """
     Manage the execution of a Forwarder to send EPICS PV updates to Kafka
 

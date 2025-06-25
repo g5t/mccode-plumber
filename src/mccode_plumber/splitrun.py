@@ -22,6 +22,13 @@ def monitors_to_kafka_callback_with_arguments(broker: str, source: str, topics: 
 
     return callback, {'dir': 'root'}
 
+# def splitrun(instr, parameters, precision, args):
+#     from restage.splitrun import splitrun_args
+#     callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker,
+#                                                                         args.source,
+#                                                                         args.topic)
+#     return splitrun_args(instr, parameters, precision, args, callback=callback,
+#                          callback_arguments=callback_args)
 
 def main():
     from .mccode import get_mcstas_instr

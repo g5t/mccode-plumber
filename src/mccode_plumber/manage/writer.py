@@ -5,7 +5,7 @@ from mccode_plumber.manage.manager import Manager, ensure_path
 
 
 @dataclass
-class WriterManager(Manager):
+class KafkaToNexus(Manager):
     """
     Manage the execution of a kafka-to-nexus file writer
 

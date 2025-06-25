@@ -144,17 +144,17 @@ def get_writer_pool(broker: str = None, job: str = None, command: str = None):
 
 
 def make_define_nexus_structure():
-    from typing import Union, Callable
+    from typing import Callable
     from mccode_antlr.instr import Instr
 
     def define_nexus_structure(
-            instr: Union[Path, str],
+            instr: Path | str,
             pvs: list[dict],
             title: str = None,
             event_stream: dict[str, str] = None,
-            file: Union[Path, None] = None,
-            func: Union[Callable[[Instr], dict], None] = None,
-            binary: Union[Path, None] = None,
+            file: Path | None = None,
+            func: Callable[[Instr], dict] | None = None,
+            binary: Path | None = None,
             origin: str = None):
         import json
         from .mccode import get_mcstas_instr
@@ -178,13 +178,20 @@ def make_define_nexus_structure():
     return define_nexus_structure
 
 
-def start_pool_writer(start_time_string, structure, filename=None, stop_time_string: str | None = None,
-                      broker: str | None = None, job_topic: str | None = None, command_topic: str | None = None,
-                      wait: bool = False, timeout: float | None = None, job_id: str | None = None):
-    from sys import exit
-    from os import EX_OK, EX_UNAVAILABLE
-    from time import sleep
+def writer_start(
+        start_time_string,
+        structure,
+        filename,
+        stop_time_string,
+        broker,
+        job_topic,
+        command_topic,
+        timeout,
+        wait,
+        job_id,
+):
     from json import dumps
+    from time import sleep
     from datetime import datetime, timedelta
     from .file_writer_control import JobHandler, WriteJob, CommandState
 
@@ -201,7 +208,6 @@ def start_pool_writer(start_time_string, structure, filename=None, stop_time_str
     end_time = datetime.now() if wait else None
     if stop_time_string is not None:
         end_time = datetime.fromisoformat(stop_time_string)
-    print(f"write file from {start_time} until {end_time}")
 
     job = WriteJob(small_string, filename, broker, start_time, end_time, job_id=job_id or "")
     # start the job
@@ -217,17 +223,37 @@ def start_pool_writer(start_time_string, structure, filename=None, stop_time_str
                     raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
                 sleep(1)
         except RuntimeError as e:
-            # raise RuntimeError(e.__str__() + f" The message was: {start.get_message()}")
-            print(f"{e} The message was: {start.get_message()}")
-            exit(EX_UNAVAILABLE)
+            raise RuntimeError(f"{e} The message was: {start.get_message()}")
+    return start, handler
 
-    if wait:
-        try:
+
+def start_pool_writer(
+        start_time_string,
+        structure,
+        filename=None,
+        stop_time_string: str | None = None,
+        broker: str | None = None,
+        job_topic: str | None = None,
+        command_topic: str | None = None,
+        wait: bool = False,
+        timeout: float | None = None,
+        job_id: str | None = None
+):
+    from sys import exit
+    from os import EX_OK, EX_UNAVAILABLE
+    from time import sleep
+
+    try:
+        start, handler = writer_start(
+            start_time_string, structure, filename, stop_time_string,
+            broker, job_topic, command_topic, timeout, wait, job_id
+        )
+        if wait:
             while not handler.is_done():
                 sleep(1)
-        except RuntimeError as error:
-            print(str(error) + f'Writer failed, producing message:\n{handler.get_message}')
-            exit(EX_UNAVAILABLE)
+    except RuntimeError as error:
+        print(str(error))
+        exit(EX_UNAVAILABLE)
     exit(EX_OK)
 
 
@@ -270,7 +296,7 @@ def parameter_description(inst_param):
     return desc
 
 
-def construct_writer_pv_dicts(instr: Union[Path, str], prefix: str, topic: str):
+def construct_writer_pv_dicts(instr: Path | str, prefix: str, topic: str):
     from .mccode import get_mccode_instr_parameters
     parameters = get_mccode_instr_parameters(instr)
     return construct_writer_pv_dicts_from_parameters(parameters, prefix, topic)

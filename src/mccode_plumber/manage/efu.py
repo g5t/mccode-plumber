@@ -4,7 +4,7 @@ from pathlib import Path
 from mccode_plumber.manage.manager import Manager, ensure_path
 
 @dataclass
-class EventFormationUnitManager(Manager):
+class EventFormationUnit(Manager):
     """
     Command and control of an Event Formation Unit
 
