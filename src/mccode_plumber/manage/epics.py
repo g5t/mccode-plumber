@@ -1,8 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from pathlib import Path
 from mccode_antlr.common import InstrumentParameter
-from p4p.nt import NTScalar
-from mccode_plumber.manage.manager import Manager
+from mccode_plumber.manage.manager import Manager, ensure_executable
 
 @dataclass
 class EPICSMailbox(Manager):
@@ -18,25 +18,30 @@ class EPICSMailbox(Manager):
     """
     parameters: tuple[InstrumentParameter, ...]
     prefix: str
-    values: dict[str, NTScalar] = field(default_factory=dict)
+    strings: list[str] = field(default_factory=list)
+    _command: Path = field(default_factory=lambda: Path('mp-epics-strings'))
 
     def __post_init__(self):
-        from mccode_plumber.epics import convert_instr_parameters_to_nt
-        if not len(self.values):
-            self.values = convert_instr_parameters_to_nt(self.parameters)
+        from mccode_plumber.epics import instr_par_nt_to_strings
+        self._command = ensure_executable(self._command)
+        if not len(self.strings):
+            self.strings = instr_par_nt_to_strings(self.parameters)
 
-    @classmethod
-    def start(cls, capture: bool = True, **config):
-        from multiprocessing import Process
-        from mccode_plumber.epics import main
-        names = cls.fieldnames()
-        kwargs = {k: config[k] for k in names if k in config}
-        obj = cls(**kwargs, _process=None)
-        obj._process = Process(target=main, args=(obj.values, obj.prefix))
-        obj._process.start()
-        return obj
+    def __run_command__(self) -> list[str]:
+        return [self._command, '--prefix', self.prefix] + self.strings
 
-    def stop(self):
-        self._process.terminate()
-        self._process.join(1)
-        self._process.close()
+    # @classmethod
+    # def start(cls, capture: bool = True, **config):
+    #     from multiprocessing import Process
+    #     from mccode_plumber.epics import main
+    #     names = cls.fieldnames()
+    #     kwargs = {k: config[k] for k in names if k in config}
+    #     obj = cls(**kwargs, _process=None)
+    #     obj._process = Process(target=main, args=(obj.values, obj.prefix))
+    #     obj._process.start()
+    #     return obj
+    #
+    # def stop(self):
+    #     self._process.terminate()
+    #     self._process.join(1)
+    #     self._process.close()

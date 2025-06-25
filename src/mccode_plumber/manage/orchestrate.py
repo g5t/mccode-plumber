@@ -99,9 +99,15 @@ def augment_structure(instr: Instr, structure: dict, title: str, prefix: str, to
 def stop_writer(broker, job_topic, command_topic, job_id, timeout):
     from time import sleep
     from mccode_plumber.file_writer_control import WorkerJobPool
+    from mccode_plumber.file_writer_control.JobStatus import JobState
     pool = WorkerJobPool(f'{broker}/{job_topic}', f'{broker}/{command_topic}')
     sleep(timeout)
     pool.try_send_stop_now(None, job_id)
+    state = pool.get_job_state(job_id)
+    while state != JobState.DONE and state != JobState.ERROR and state != JobState.TIMEOUT:
+        sleep(0.1)
+        state = pool.get_job_state(job_id)
+
 
 
 def start_writer(start_time, structure, filename, broker, job_topic, command_topic,
@@ -205,6 +211,7 @@ def conduct(
     from mccode_plumber.manage import (EventFormationUnit, EPICSMailbox, Forwarder, KafkaToNexus)
 
     # now = datetime.now(timezone.utc).isoformat(timespec='seconds').split('+')[0]
+    # TODO Verify that UTC is the right time to use for file-writer start/stop times
     now = datetime.now(timezone.utc)
     prefix = 'mcstas:'
     title = f'{instr.name} simulation {now}: {splitrun_kwargs["args"]}'
@@ -266,6 +273,10 @@ def conduct(
 
     # Wait for the file-writer to finish its job (possibly kill it)
     stop_writer(broker, topics['job'], topics['command'], job_id, 2.0)
+
+    # Verify that the file has been written?
+    path = ensure_readable_file(Path(filename))
+    print(f'Finished writing {path}')
 
     # De-register the forwarder topics (Don't bother since we're about to kill it?)
     deconfigure_forwarder(instr, broker, topics['config'], prefix, topics['parameter'])
