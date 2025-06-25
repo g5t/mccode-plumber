@@ -1,6 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from mccode_plumber.manage.manager import Manager, ensure_path
+from dataclasses import dataclass, field
+from pathlib import Path
+from mccode_plumber.manage.manager import Manager, ensure_executable
 
 
 @dataclass
@@ -32,13 +33,11 @@ class Forwarder(Manager):
     status: str | None = None
     retrieve: bool = False
     verbosity: str | None = None
-    forwarder_command: str = 'forwarder-launch'
+    _command: Path = field(default_factory=lambda: Path('forwarder-launch'))
 
     def __post_init__(self):
-        from os import access, X_OK
         from mccode_plumber.kafka import register_kafka_topics, all_exist
-        if not access(self.forwarder_command, X_OK):
-            raise ValueError(f'{self.forwarder_command} is not a valid command')
+        self._command =ensure_executable(self._command)
         if self.broker is None:
             self.broker = 'localhost:9092'
         if self.config is None:
@@ -59,7 +58,7 @@ class Forwarder(Manager):
 
     def __run_command__(self) -> list[str]:
         args = [
-            self.forwarder_command,
+            self._command,
             '--config-topic', self.config,
             '--status-topic', self.status,
             '--output-broker', self.broker,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from mccode_antlr.instr import Instr
 
@@ -142,12 +144,11 @@ def get_topics(data: dict):
     return topics
 
 
-def load_structure_file(structure_file):
-    from os import access, R_OK
+def load_file_json(file: str | Path):
+    from mccode_plumber.manage.manager import ensure_readable_file
     from json import load
-    if not (structure_file.exists() and structure_file.is_file() and access(structure_file, R_OK)):
-        raise ValueError('You must provide a nexus-structure file')
-    with open(structure_file, 'r') as f:
+    file = ensure_readable_file(file)
+    with file.open('r') as f:
         return load(f)
 
 
@@ -176,7 +177,7 @@ def main():
     args, parameters, precision = parse_splitrun(make_parser())
     instr = get_mcstas_instr(args.instrument[0])
 
-    structure = load_structure_file(args.structure if args.structure else Path(args.instrument[0]).with_suffix('.json'))
+    structure = load_file_json(args.structure if args.structure else Path(args.instrument[0]).with_suffix('.json'))
     broker = 'localhost:9092'
     monitor_source = 'mccode-to-kafka'
     callback_topics = list(get_topics(structure))  # all structure-topics might be monitor topics?

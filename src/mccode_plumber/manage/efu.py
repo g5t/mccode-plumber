@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from mccode_plumber.manage.manager import Manager, ensure_path
+from mccode_plumber.manage.manager import Manager, ensure_readable_file, ensure_executable
 
 @dataclass
 class EventFormationUnit(Manager):
@@ -33,10 +33,9 @@ class EventFormationUnit(Manager):
     monitor_consecutive: int = 2
 
     def __post_init__(self):
-        from os import X_OK, R_OK
-        self.binary = ensure_path(self.binary, X_OK)
-        self.config = ensure_path(self.config, R_OK)
-        self.calibration = ensure_path(self.calibration, R_OK)
+        self.binary = ensure_executable(self.binary)
+        self.config = ensure_readable_file(self.config)
+        self.calibration = ensure_readable_file(self.calibration)
         if self.broker is None:
             self.broker = 'localhost:9092'
         if self.topic is None:
