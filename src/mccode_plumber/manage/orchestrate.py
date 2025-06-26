@@ -4,15 +4,18 @@ from pathlib import Path
 
 from mccode_antlr.common import InstrumentParameter
 from mccode_antlr.instr import Instr
-from mccode_plumber.manage.manager import ensure_readable_file, ensure_executable
+from mccode_plumber.manage import ensure_readable_file, ensure_writable_file, ensure_executable
+
 
 def guess_instr_config(name: str):
     guess = f'/event-formation-unit/configs/{name}/configs/{name}.json'
     return ensure_readable_file(Path(guess))
 
+
 def guess_instr_calibration(name: str):
     guess = f'/event-formation-unit/configs/{name}/configs/{name}nullcalib.json'
     return ensure_readable_file(Path(guess))
+
 
 def guess_instr_efu(name: str):
     guess = name.split('_')[0].split('.')[0].split('-')[0].lower()
@@ -25,62 +28,6 @@ def register_topics(broker: str, topics: list[str]):
     res = register_kafka_topics(broker, topics)
     if not all_exist(res.values()):
         raise RuntimeError(f'Missing Kafka topics? {res}')
-
-
-def configure_forwarder(
-        parameters: tuple[InstrumentParameter, ...],
-        broker: str,
-        config: str,
-        prefix: str,
-        topic: str
-):
-    """Configure forwarder by sending a configuration broker ADD streams for parameters
-
-    Parameters
-    ----------
-    parameters: tuple[InstrumentParameter, ...]
-        the parameters to build stream information for
-    broker : str
-        the Kafka broker that hosts the configuration and topic streams
-    config : str
-        the configuration stream name
-    prefix : str
-        the prefix to add to the stream source name for each parameter
-    topic : str
-        the Kafka topic to which updates will be sent, at the configuration broker
-    """
-    from mccode_plumber.forwarder import (
-        configure_forwarder as cf, forwarder_partial_streams as fps
-    )
-    cf(fps(prefix, topic, parameters), f'{broker}/{config}', prefix, topic)
-
-
-def deconfigure_forwarder(
-        parameters: tuple[InstrumentParameter, ...],
-        broker: str,
-        config: str,
-        prefix: str,
-        topic: str
-):
-    """Stop forwarder by sending a configuration broker REMOVE streams for parameters
-
-    Parameters
-    ----------
-    parameters: tuple[InstrumentParameter, ...]
-        the parameters to build stream information for
-    broker : str
-        the Kafka broker that hosts the configuration and topic streams
-    config : str
-        the configuration stream name
-    prefix : str
-        the prefix to add to the stream source name for each parameter
-    topic : str
-        the Kafka topic to which updates will no longer be sent, at the configuration broker
-    """
-    from mccode_plumber.forwarder import (
-        reset_forwarder as rf, forwarder_partial_streams as fps
-    )
-    rf(fps(prefix, topic, parameters), f'{broker}/{config}', prefix, topic)
 
 
 def augment_structure(
@@ -129,7 +76,6 @@ def stop_writer(broker, job_topic, command_topic, job_id, timeout):
         state = pool.get_job_state(job_id)
 
 
-
 def start_writer(start_time, structure, filename, broker, job_topic, command_topic,
                  timeout):
     from uuid import uuid4
@@ -142,7 +88,7 @@ def start_writer(start_time, structure, filename, broker, job_topic, command_top
             broker=broker, job_topic=job_topic, command_topic=command_topic,
             timeout=timeout, job_id=job_id, wait=False
         )
-        success = start.is_done()
+        # success = start.is_done() # this causes an infinite hang?
     except RuntimeError as e:
         if job_id in str(e):
             # starting the job failed, so try to kill it
@@ -162,7 +108,6 @@ def get_topics(data: dict):
 
 
 def load_file_json(file: str | Path):
-    from mccode_plumber.manage.manager import ensure_readable_file
     from json import load
     file = ensure_readable_file(file)
     with file.open('r') as f:
@@ -170,9 +115,7 @@ def load_file_json(file: str | Path):
 
 
 def get_instr_name_and_parameters(file: str | Path):
-    from mccode_plumber.manage.manager import ensure_readable_file
     file = ensure_readable_file(file)
-
     if file.suffix == '.h5':
         # Shortcut loading the whole Instr:
         import h5py
@@ -201,6 +144,7 @@ def make_services_parser():
     parser.add_argument('--efu', type=str, default=None, help='EFU binary path/name')
     parser.add_argument('--config', type=str, default=None, help='EFU configuration JSON')
     parser.add_argument('--calibration', type=str, default=None, help='EFU calibration JSON')
+    parser.add_argument('--writer-working-dir', type=str, default=None, help='Working directory for kafka-to-nexus')
     return parser
 
 
@@ -214,7 +158,7 @@ def services():
         'efu': args.efu,
         'config': args.config,
         'calibration': args.calibration,
-        'work': args.work,
+        'work': args.writer_working_dir,
     }
     load_in_wait_load_out(**kwargs)
 
@@ -223,10 +167,10 @@ def load_in_wait_load_out(
             instr_name: str,
             instr_parameters: tuple[InstrumentParameter, ...],
             broker: str,
-            efu: str = None,
-            config: str = None,
-            calibration: str = None,
-            work: str = None,
+            efu: str | None = None,
+            config: str | None = None,
+            calibration: str | None = None,
+            work: str | None = None,
             manage: bool = True,
     ):
         import signal
@@ -297,9 +241,9 @@ def make_splitrun_nexus_parser():
     parser.prog = 'mp-nexus-splitrun'
     parser.add_argument('-v' ,'--version', action='version', version=__version__)
     # No need to specify the broker, or monitor source or topic names
-    parser.add_argument('--work', type=str, default=None, help='Working directory')
     parser.add_argument('--structure', type=str, default=None, help='NeXus Structure JSON path')
     parser.add_argument('--structure-out', type=str, default=None, help='Output configured structure JSON path')
+    parser.add_argument('--nexus-file', type=str, default=None, help='Output NeXus file path')
     return parser
 
 def main():
@@ -328,27 +272,26 @@ def main():
     return orchestrate(instr, structure, broker, splitrun_kwargs, **conduct_kwargs)
 
 
-
 def orchestrate(
         instr: Instr,
         structure,
         broker: str,
         splitrun_kwargs: dict,
-        work: str = None,
-        structure_out: str = None,
+        nexus_file: str | None= None,
+        structure_out: str | None = None,
 ):
     from datetime import datetime, timezone
     from restage.splitrun import splitrun_args
-
-    if not isinstance(work, Path):
-        work = Path(work) if work else Path()
+    from mccode_plumber.forwarder import (
+        forwarder_partial_streams, configure_forwarder, reset_forwarder
+    )
 
     # now = datetime.now(timezone.utc).isoformat(timespec='seconds').split('+')[0]
     # TODO Verify that UTC is the right time to use for file-writer start/stop times
     now = datetime.now(timezone.utc)
     prefix = 'mcstas:'
     title = f'{instr.name} simulation {now}: {splitrun_kwargs["args"]}'
-    filename = work.resolve() / f'{instr.name}_{now:%y%m%dT%H%M%S}.h5'
+    filename = ensure_writable_file(nexus_file or f'{instr.name}_{now:%y%m%dT%H%M%S}.h5')
     topics = {
         'parameter': 'SimulatedParameters',
         'config': 'ForwardConfig',
@@ -357,7 +300,9 @@ def orchestrate(
     }
 
     # Tell the forwarder what to forward
-    configure_forwarder(instr.parameters, broker, topics['config'], prefix, topics['parameter'])
+    partial_streams = forwarder_partial_streams(prefix, topics['parameter'], instr.parameters)
+    forwarder_config = f"{broker}/{topics['config']}"
+    configure_forwarder(partial_streams, forwarder_config, prefix, topics['parameter'])
 
     # Create a file-writer job
     structure = augment_structure(instr.parameters, structure, title, prefix, topics['parameter'])
@@ -377,9 +322,11 @@ def orchestrate(
     # Wait for the file-writer to finish its job (possibly kill it)
     stop_writer(broker, topics['job'], topics['command'], job_id, 2.0)
 
-    # Verify that the file has been written?
-    path = ensure_readable_file(Path(filename))
-    print(f'Finished writing {path}')
+    # De-register the forwarder topics
+    reset_forwarder(partial_streams, forwarder_config, prefix, topics['parameter'])
 
-    # De-register the forwarder topics (Don't bother since we're about to kill it?)
-    deconfigure_forwarder(instr.parameters, broker, topics['config'], prefix, topics['parameter'])
+    # Verify that the file has been written?
+    ensure_readable_file(filename)
+    print(f'Finished writing {filename}')
+
+
