@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
-from mccode_plumber.manage.manager import Manager, ensure_executable
+from .manager import Manager
+from .ensure import ensure_executable
 
 
 @dataclass

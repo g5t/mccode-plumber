@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
-from mccode_plumber.manage.manager import Manager
+from .manager import Manager
+from .ensure import ensure_writable_directory, ensure_executable
 
 
 @dataclass
@@ -28,9 +29,6 @@ class KafkaToNexus(Manager):
 
     def __post_init__(self):
         from mccode_plumber.kafka import register_kafka_topics, all_exist
-        from mccode_plumber.manage.manager import (
-            ensure_writable_directory, ensure_executable
-        )
         self._command = ensure_executable(self._command)
         if self.broker is None:
             self.broker = 'localhost:9092'

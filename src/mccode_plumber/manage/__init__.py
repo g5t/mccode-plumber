@@ -1,3 +1,4 @@
+from .manager import Manager
 from .efu import EventFormationUnit
 from .epics import EPICSMailbox
 from .forwarder import Forwarder
@@ -10,6 +11,7 @@ from .ensure import (
 
 
 __all__ = (
+    "Manager",
     "EventFormationUnit",
     "EPICSMailbox",
     "Forwarder",
