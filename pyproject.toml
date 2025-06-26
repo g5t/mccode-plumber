@@ -38,7 +38,8 @@ mp-writer-kill = 'mccode_plumber.writer:kill_job'
 mp-writer-killall = 'mccode_plumber.writer:kill_all'
 mp-register-topics = 'mccode_plumber.kafka:register_topics'
 mp-insert-hdf5-instr = 'mccode_plumber.mccode:insert'
-mp-splitrun-nexus = 'mccode_plumber.manage.orchestrate:main'
+mp-nexus-splitrun = 'mccode_plumber.manage.orchestrate:main'
+mp-nexus-waiter = 'mccode_plumber.manage.orchestrate:waiter'
 
 [tool.setuptools_scm]
 
