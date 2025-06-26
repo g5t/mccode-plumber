@@ -44,7 +44,7 @@ class KafkaToNexus(Manager):
 
     def __run_command__(self) -> list[str]:
         args = [
-            self._command,
+            self._command.as_posix(),
             '--brokers', self.broker,
             '--command-status-topic', self.command,
             '--job-pool-topic', self.job,

@@ -139,6 +139,7 @@ def insert_events_in_nexus_structure(ns: dict, config: dict):
 
 def get_writer_pool(broker: str = None, job: str = None, command: str = None):
     from .file_writer_control import WorkerJobPool
+    print(f'Create a Writer pool for {broker=} {job=} {command=}')
     pool = WorkerJobPool(f"{broker}/{job}", f"{broker}/{command}")
     return pool
 
@@ -215,9 +216,9 @@ def writer_start(
     if timeout is not None:
         try:
             # ensure the start succeeds:
-            zero_time = datetime.now()
+            give_up_time = datetime.now() + timedelta(seconds=timeout)
             while not start.is_done():
-                if zero_time + timedelta(seconds=timeout) < datetime.now():
+                if give_up_time < datetime.now():
                     raise RuntimeError(f"Timed out while starting job {job.job_id}")
                 elif start.get_state() == CommandState.ERROR:
                     raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")

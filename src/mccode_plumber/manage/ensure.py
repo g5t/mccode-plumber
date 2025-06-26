@@ -43,6 +43,8 @@ def ensure_readable_file(path: str| Path) -> Path:
     return ensure_accessible_file(path, R_OK)
 
 def ensure_writable_file(path: str| Path) -> Path:
+    if not isinstance(path, Path):
+        path = Path(path)
     return (
             ensure_accessible_directory(path.parent, W_OK)
             and ensure_accessible_file(path, W_OK, must_exist=False)

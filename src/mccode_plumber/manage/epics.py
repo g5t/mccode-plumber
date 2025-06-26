@@ -29,7 +29,7 @@ class EPICSMailbox(Manager):
             self.strings = instr_par_nt_to_strings(self.parameters)
 
     def __run_command__(self) -> list[str]:
-        return [self._command, '--prefix', self.prefix] + self.strings
+        return [self._command.as_posix(), '--prefix', self.prefix] + self.strings
 
     # @classmethod
     # def start(cls, capture: bool = True, **config):

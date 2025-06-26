@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-
+from datetime import datetime, timezone
 from mccode_antlr.common import InstrumentParameter
 from mccode_antlr.instr import Instr
 from mccode_plumber.manage import ensure_readable_file, ensure_writable_file, ensure_executable
@@ -65,46 +65,73 @@ def augment_structure(
 
 def stop_writer(broker, job_topic, command_topic, job_id, timeout):
     from time import sleep
+    from datetime import timedelta
     from mccode_plumber.file_writer_control import WorkerJobPool
     from mccode_plumber.file_writer_control.JobStatus import JobState
     pool = WorkerJobPool(f'{broker}/{job_topic}', f'{broker}/{command_topic}')
     sleep(timeout)
     pool.try_send_stop_now(None, job_id)
     state = pool.get_job_state(job_id)
-    while state != JobState.DONE and state != JobState.ERROR and state != JobState.TIMEOUT:
-        sleep(0.1)
+    give_up = datetime.now() + timedelta(seconds=timeout)
+    while state != JobState.DONE and state != JobState.ERROR and state != JobState.TIMEOUT and datetime.now() < give_up:
+        sleep(1)
         state = pool.get_job_state(job_id)
+    print(f'Done trying to stop {job_id} -> {state}')
 
 
-def start_writer(start_time, structure, filename, broker, job_topic, command_topic,
-                 timeout):
+def start_writer(start_time: datetime,
+                 structure: dict,
+                 filename: Path,
+                 broker: str,
+                 job_topic: str,
+                 command_topic: str,
+                 timeout: float):
     from uuid import uuid4
     from mccode_plumber.writer import writer_start
     job_id = str(uuid4())
     success = False
     try:
+        print(f"Starting {job_id} from {start_time} for {filename}")
         start, handler = writer_start(
-            start_time.isoformat(), structure, filename=filename, stop_time_string=None,
+            start_time.isoformat(), structure, filename=filename.as_posix(),
+            stop_time_string=None,
             broker=broker, job_topic=job_topic, command_topic=command_topic,
             timeout=timeout, job_id=job_id, wait=False
         )
         # success = start.is_done() # this causes an infinite hang?
+        print(f"Message to start {job_id} sent")
     except RuntimeError as e:
         if job_id in str(e):
             # starting the job failed, so try to kill it
+            print(f"Starting {job_id} failed! Error: {e}")
             stop_writer(broker, job_topic, command_topic, job_id, timeout)
 
     return job_id, success
 
 
-def get_topics(data: dict):
+def get_topics_iter(data: list | tuple):
+    topics = set()
+    for entry in data:
+        if isinstance(entry, dict):
+            topics.update(get_topics_dict(entry))
+        elif isinstance(entry, (list, tuple)):
+            topics.update(get_topics_iter(entry))
+    return topics
+
+def get_topics_dict(data: dict):
     topics = set()
     for k, v in data.items():
         if isinstance(v, dict):
-            topics.update(get_topics(v))
+            topics.update(get_topics_dict(v))
+        elif isinstance(v, (list, tuple)):
+            topics.update(get_topics_iter(list(v)))
         elif k == 'topic':
             topics.add(v)
     return topics
+
+def get_topics_json(data: dict) -> list[str]:
+    """Traverse a loaded JSON object and return the found list of topic names"""
+    return list(get_topics_dict(data))
 
 
 def load_file_json(file: str | Path):
@@ -174,6 +201,8 @@ def load_in_wait_load_out(
             manage: bool = True,
     ):
         import signal
+        from time import sleep
+        from colorama import Fore, Back, Style
         from mccode_plumber.manage import (
             EventFormationUnit, EPICSMailbox, Forwarder, KafkaToNexus
         )
@@ -189,8 +218,10 @@ def load_in_wait_load_out(
         }
 
         # Start up services if they should be managed locally
-        services = () if not manage else (
+        things = () if not manage else (
             EventFormationUnit.start(
+                name='EFU',
+                style=Fore.BLUE,
                 binary=efu or guess_instr_efu(instr_name),
                 config=config or guess_instr_config(name=instr_name),
                 calibration=calibration or guess_instr_calibration(name=instr_name),
@@ -198,15 +229,21 @@ def load_in_wait_load_out(
                 topic=topics['event'],
             ),
             Forwarder.start(
+                name='FWD',
+                style=Fore.GREEN,
                 broker=broker,
                 config=topics['config'],
                 status=topics['status'],
             ),
             EPICSMailbox.start(
+                name='MBX',
+                style=Fore.YELLOW + Back.LIGHTCYAN_EX,
                 parameters=instr_parameters,
                 prefix=prefix,
             ),
             KafkaToNexus.start(
+                name='K2N',
+                style=Fore.RED + Style.DIM,
                 broker=broker,
                 work=work,
                 command=topics['command'],
@@ -220,18 +257,27 @@ def load_in_wait_load_out(
         def signal_handler(signum, frame):
             if signum == signal.SIGINT:
                 print('Done waiting, following SIGINT')
-                for service in services:
+                for service in things:
                     service.stop()
                 exit(0)
             else:
                 print(f'Received signal {signum}, ignoring')
 
         signal.signal(signal.SIGINT, signal_handler)
-        print('Run `mp-nexus-splitrun` in another process now')
-        print('Press Ctrl+C to exit')
-        signal.pause()
-
-        # In another process, now call orchestrate ...
+        print(
+            Fore.YELLOW+Back.LIGHTGREEN_EX+Style.BRIGHT
+            + "\tYou can now run 'mp-nexus-splitrun' in another process"
+            + " (Press CTRL+C to exit)." + Style.RESET_ALL
+        )
+        # signal.pause()
+        while all(service.poll() for service in things):
+            # Try to grab and print any updates
+            sleep(0.1)
+        # If we reach here, one or more service has _already_ stopped
+        for service in things:
+            if not service.poll():
+                print(f'{service.name} exited unexpectedly')
+            service.stop()
 
 
 def make_splitrun_nexus_parser():
@@ -246,6 +292,7 @@ def make_splitrun_nexus_parser():
     parser.add_argument('--nexus-file', type=str, default=None, help='Output NeXus file path')
     return parser
 
+
 def main():
     from mccode_plumber.mccode import get_mcstas_instr
     from restage.splitrun import parse_splitrun
@@ -256,20 +303,24 @@ def main():
     structure = load_file_json(args.structure if args.structure else Path(args.instrument[0]).with_suffix('.json'))
     broker = 'localhost:9092'
     monitor_source = 'mccode-to-kafka'
-    callback_topics = list(get_topics(structure))  # all structure-topics might be monitor topics?
-    register_topics(broker, callback_topics) # ensure the topics are known to Kafka
+    callback_topics = get_topics_json(structure)  # all structure-topics might be monitor topics?
+    if len(callback_topics):
+        print(f'register {callback_topics}')
+        register_topics(broker, callback_topics) # ensure the topics are known to Kafka
+    else:
+        print('no callback topics registered')
 
     callback, callback_args = monitors_to_kafka_callback_with_arguments(broker, monitor_source, callback_topics)
     splitrun_kwargs = {
         'args': args, 'parameters': parameters, 'precision': precision,
         'callback': callback, 'callback_arguments': callback_args,
     }
-    conduct_kwargs = {
-        'work': args.work, 'structure_out': args.structure_out
+    kwargs = {
+        'nexus_file': args.nexus_file, 'structure_out': args.structure_out
     }
-    for k in list(conduct_kwargs.keys()) + ['structure']:
+    for k in list(kwargs.keys()) + ['structure']:
         delattr(args, k)
-    return orchestrate(instr, structure, broker, splitrun_kwargs, **conduct_kwargs)
+    return orchestrate(instr, structure, broker, splitrun_kwargs, **kwargs)
 
 
 def orchestrate(
@@ -311,16 +362,24 @@ def orchestrate(
         with open(structure_out, 'w') as f:
             dump(structure, f)
 
+    print("JSON NeXus Structure augmented")
+
     job_id, success = start_writer(
-        now, structure, filename, broker, topics['job'], topics['command'], 2.0,
+        now, structure, filename, broker, topics['job'], topics['command'], 60.0,
     )
+
+    print("Writer job started")
 
     # Do the actual simulation, calling into restage.splitrun after parsing,
     # Using the provided callbacks to send monitor data to Kafka
     splitrun_args(instr, **splitrun_kwargs)
 
+    print("Splitrun simulation finished")
+
     # Wait for the file-writer to finish its job (possibly kill it)
     stop_writer(broker, topics['job'], topics['command'], job_id, 2.0)
+
+    print("Writer job finished")
 
     # De-register the forwarder topics
     reset_forwarder(partial_streams, forwarder_config, prefix, topics['parameter'])

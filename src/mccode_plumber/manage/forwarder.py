@@ -59,7 +59,7 @@ class Forwarder(Manager):
 
     def __run_command__(self) -> list[str]:
         args = [
-            self._command,
+            self._command.as_posix(),
             '--config-topic', self.config,
             '--status-topic', self.status,
             '--output-broker', self.broker,

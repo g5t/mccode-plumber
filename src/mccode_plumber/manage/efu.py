@@ -46,16 +46,16 @@ class EventFormationUnit(Manager):
             self.samples_topic = f'{self.topic}_samples'
 
     def __run_command__(self):
-        argv = [self.binary,
+        argv = [self.binary.as_posix(),
                 '-b', self.broker,
                 '-t', self.topic,
-                '--ar51_topic', self.topic,
-                '--file', self.config,
-                '--calibration', self.calibration,
+                '--ar51_topic', self.samples_topic,
+                '--file', self.config.as_posix(),
+                '--calibration', self.calibration.as_posix(),
                 '--port', str(self.port),
                 '--cmdport', str(self.command),
-                '--monitor-every', str(self.monitor_every),
-                '--monitor-consecutive', str(self.monitor_consecutive),
+                '--monitor_every', str(self.monitor_every),
+                '--monitor_consecutive', str(self.monitor_consecutive),
                 '--nohwcheck']
         return argv
 
