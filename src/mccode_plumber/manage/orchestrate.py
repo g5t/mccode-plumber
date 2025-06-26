@@ -169,7 +169,10 @@ def load_file_json(file: str | Path):
         return load(f)
 
 
-def get_instr_name_and_parameters(file):
+def get_instr_name_and_parameters(file: str | Path):
+    from mccode_plumber.manage.manager import ensure_readable_file
+    file = ensure_readable_file(file)
+
     if file.suffix == '.h5':
         # Shortcut loading the whole Instr:
         import h5py
@@ -187,10 +190,10 @@ def get_instr_name_and_parameters(file):
     raise ValueError('Unsupported file extension')
 
 
-def make_waiter_parser():
+def make_services_parser():
     from mccode_plumber import __version__
     from argparse import ArgumentParser
-    parser = ArgumentParser('mp-nexus-waiter')
+    parser = ArgumentParser('mp-nexus-services')
     parser.add_argument('instrument', type=str, help='Instrument .instr or .h5 file')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     # No need to specify the broker, or monitor source or topic names
@@ -201,8 +204,8 @@ def make_waiter_parser():
     return parser
 
 
-def waiter():
-    args = make_waiter_parser().parse_args()
+def services():
+    args = make_services_parser().parse_args()
     instr_name, instr_parameters = get_instr_name_and_parameters(args.instrument)
     kwargs = {
         'instr_name': instr_name,
