@@ -14,8 +14,9 @@ class EPICSMailbox(Manager):
     ----------
     parameters: the instrument parameters which define the PV values
     prefix:     a PV value prefix to use with all instrument-defined parameters
-    values:     optional dictionary of PV name: value pairs, if the instrument
-                is not to be used for determining which PVs should be used
+    strings:    optional list of NT parameter information to configure the
+                mailbox when the instrument parameters are not available for
+                use in determining the same information.
     """
     parameters: tuple[InstrumentParameter, ...]
     prefix: str
@@ -30,19 +31,3 @@ class EPICSMailbox(Manager):
 
     def __run_command__(self) -> list[str]:
         return [self._command.as_posix(), '--prefix', self.prefix] + self.strings
-
-    # @classmethod
-    # def start(cls, capture: bool = True, **config):
-    #     from multiprocessing import Process
-    #     from mccode_plumber.epics import main
-    #     names = cls.fieldnames()
-    #     kwargs = {k: config[k] for k in names if k in config}
-    #     obj = cls(**kwargs, _process=None)
-    #     obj._process = Process(target=main, args=(obj.values, obj.prefix))
-    #     obj._process.start()
-    #     return obj
-    #
-    # def stop(self):
-    #     self._process.terminate()
-    #     self._process.join(1)
-    #     self._process.close()

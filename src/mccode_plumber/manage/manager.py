@@ -87,14 +87,9 @@ class Manager:
         from subprocess import Popen, PIPE
         from select import select
         argv = self.__run_command__()
-        # root = Path(__file__).parent
-        # if isinstance(capture, bool):
-        #     return run(argv, capture_output=capture, cwd=root, text=True)
-        # else:
-        #     return run(argv, cwd=root, stdout=capture, stderr=STDOUT)
+
         shell = isinstance(argv, str)
         conn.send((IOType.stdout, f'Starting {argv if shell else " ".join(argv)}\n'))
-
         process = Popen(argv, shell=shell, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True, )
         out, err = process.stdout.fileno(), process.stderr.fileno()
         check = [process.stdout, process.stderr]
