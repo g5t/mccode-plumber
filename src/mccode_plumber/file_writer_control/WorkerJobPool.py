@@ -19,7 +19,7 @@ class WorkerJobPool(WorkerFinder):
         self,
         job_topic_url: str,
         command_topic_url: str,
-        max_message_size: int = 1048576 * 200,
+        max_message_size: int = 104857600, # matching the default for Kafka -- previously was 2x larger
         kafka_config: Dict[str, str] = {},
     ):
         """

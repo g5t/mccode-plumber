@@ -5,10 +5,9 @@ from p4p.server.thread import SharedPV
 from pathlib import Path
 from typing import Union
 
-
-def convert_instr_parameters_to_nt(parameters):
+def instr_par_to_nt_primitive(parameters):
     from mccode_antlr.common.expression import DataType, ShapeType
-    out = {}
+    out = []
     for p in parameters:
         expr = p.value
         if expr.is_str:
@@ -21,7 +20,37 @@ def convert_instr_parameters_to_nt(parameters):
             raise ValueError(f"Unknown parameter type {expr.data_type}")
         if expr.shape_type == ShapeType.vector:
             t, d = 'a' + t, [d]
-        out[p.name] = NTScalar(t).wrap(expr.value if expr.has_value else d)
+        out.append((p.name, t, d))
+    return out
+
+def instr_par_nt_to_strings(parameters):
+    return [f'{n}:{t}:{d}'.replace(' ','') for n, t, d in instr_par_to_nt_primitive(parameters)]
+
+def strings_to_instr_par_nt(strings):
+    out = []
+    for string in strings:
+        name, t, dstr = string.split(':')
+        trans = None
+        if 'i' in t:
+            trans = int
+        elif 'd' in t:
+            trans = float
+        elif 's' in t:
+            trans = str
+        else:
+            ValueError(f"Unknown type in {string}")
+        if t.startswith('a'):
+            d = [trans(x) for x in dstr.translate(str.maketrans(',',' ','[]')).split()]
+        else:
+            d = trans(dstr)
+        out.append((name, t, d))
+    return out
+
+def convert_strings_to_nt(strings):
+    return {n: NTScalar(t).wrap(d) for n, t, d in strings_to_instr_par_nt(strings)}
+
+def convert_instr_parameters_to_nt(parameters):
+    out = {n: NTScalar(t).wrap(d) for n, t, d in instr_par_to_nt_primitive(parameters)}
     return out
 
 
@@ -67,14 +96,16 @@ def parse_args():
     return parameters, args
 
 
-def main(names: dict[str, NTScalar], prefix: str = None):
+def main(names: dict[str, NTScalar], prefix: str = None, filename_required: bool = True):
     provider = StaticProvider('mailbox')  # 'mailbox' is an arbitrary name
+
+    if filename_required and 'mcpl_filename' not in names:
+        names['mcpl_filename'] = NTScalar('s').wrap('')
 
     pvs = []  # we must keep a reference in order to keep the Handler from being collected
     for name, value in names.items():
         pv = SharedPV(initial=value, handler=MailboxHandler())
         provider.add(f'{prefix}{name}' if prefix else name, pv)
-        print(f'Add mailbox for {prefix}{name}')
         pvs.append(pv)
 
     print(f'Start mailbox server for {len(pvs)} PVs with prefix {prefix}')
@@ -133,6 +164,22 @@ def update():
             raise ValueError(f'Address {address} has unknown type {type(pv)}')
 
     ctx.disconnect()
+
+
+def get_strings_parser():
+    from argparse import ArgumentParser
+    from mccode_plumber import __version__
+    p = ArgumentParser()
+    p.add_argument('strings', type=str, nargs='+', help='The string encoded NTScalars to read, each name:type-char:default')
+    p.add_argument('-p', '--prefix', type=str, help='The EPICS PV prefix to use', default='mcstas:')
+    p.add_argument('-v', '--version', action='version', version=__version__)
+    return p
+
+
+def run_strings():
+    args = get_strings_parser().parse_args()
+    main(convert_strings_to_nt(args.strings), prefix=args.prefix)
+
 
 
 if __name__ == '__main__':

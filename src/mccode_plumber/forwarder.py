@@ -59,6 +59,15 @@ def reset_forwarder(pvs: list[dict], config=None, prefix=None, topic=None):
     return pvs
 
 
+def forwarder_partial_streams(prefix, topic, parameters):
+    names = [p.name for p in parameters]
+    if 'mcpl_filename' not in names:
+        names.append("mcpl_filename")
+    # Minimal information used by the forwarder for stream setup:
+    partial = [dict(source=f'{prefix}{n}', module='f144', topic=topic) for n in names]
+    return partial
+
+
 def parse_registrar_args():
     from argparse import ArgumentParser
     from .mccode import get_mccode_instr_parameters
@@ -72,11 +81,7 @@ def parse_registrar_args():
     parser.add_argument('-v', '--version', action='version', version=__version__)
 
     args = parser.parse_args()
-    parameter_names = [p.name for p in get_mccode_instr_parameters(args.instrument)]
-    if 'mcpl_filename' not in parameter_names:
-        parameter_names.append('mcpl_filename')
-    # the forwarder only cares about: "source", "module", "topic"
-    params = [{'source': f'{args.prefix}{name}', 'module': 'f144', 'topic': args.topic} for name in parameter_names]
+    params = forwarder_partial_streams(args.prefix, args.topic, get_mccode_instr_parameters(args.instrument))
     return params, args
 
 

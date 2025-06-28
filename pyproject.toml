@@ -8,10 +8,11 @@ dependencies = [
     'p4p',
     'kafka-python>=2.2.11',
     'ess-streaming-data-types>=0.14.0',
-    'restage>=0.7.1',
+    'restage>=0.7.2',
     'mccode-to-kafka>=0.2.2',
     'moreniius>=0.4.0',
     'icecream',
+    'ephemeral-port-reserve',
 ]
 readme = "README.md"
 authors = [
@@ -25,6 +26,7 @@ dynamic = ['version']
 [project.scripts]
 mp-splitrun = 'mccode_plumber.splitrun:main'
 mp-epics = 'mccode_plumber.epics:run'
+mp-epics-strings = 'mccode_plumber.epics:run_strings'
 mp-epics-update = 'mccode_plumber.epics:update'
 mp-forwarder-setup = 'mccode_plumber.forwarder:setup'
 mp-forwarder-teardown = 'mccode_plumber.forwarder:teardown'
@@ -36,6 +38,8 @@ mp-writer-kill = 'mccode_plumber.writer:kill_job'
 mp-writer-killall = 'mccode_plumber.writer:kill_all'
 mp-register-topics = 'mccode_plumber.kafka:register_topics'
 mp-insert-hdf5-instr = 'mccode_plumber.mccode:insert'
+mp-nexus-splitrun = 'mccode_plumber.manage.orchestrate:main'
+mp-nexus-services = 'mccode_plumber.manage.orchestrate:services'
 
 [tool.setuptools_scm]
 
