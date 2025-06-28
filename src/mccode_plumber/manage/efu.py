@@ -51,11 +51,20 @@ class EventFormationUnitConfig:
 
     def to_cli_str(self):
         from json import dumps
-        return dumps(self.to_dict()).translate(str.maketrans(',',';',' {}"'))
+        return dumps(self.to_dict()).translate(str.maketrans('','',' {}"'))
 
     @classmethod
     def from_cli_str(cls, cli_str: str):
-        data ={k: v for k, v in [z.split(':') for z in [x for x in cli_str.split(';')]]}
+        """Split a command-line argument string into a EventFormationUnitConfig
+
+        Note
+        ----
+        A command-line argument string is expected to have the following format:
+            "arg1:value1,arg2:value2,...,argN:valueN"
+        That is, key-value pairs separated from each other by commas and internally
+        by a colon. This allows for _values_ which contain colons, but not keys.
+        """
+        data =dict(z.split(':', maxsplit=1) for z in [x for x in cli_str.split(',')])
         return cls.from_dict(data)
 
 

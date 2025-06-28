@@ -177,17 +177,17 @@ def get_instr_name_and_parameters(file: str | Path):
 def efu_parameter(s: str):
     if ':' in s:
         # with any ':' we require fully specified
-        #  name:{name};binary:{binary};config:{config_path};calibration:{calibration_path};topic:{topic};port:{port}
+        #  name:{name},binary:{binary},config:{config_path},calibration:{calibration_path},topic:{topic},port:{port}
         # what about spaces? or windows-style paths with C:/...
         return EventFormationUnitConfig.from_cli_str(s)
     # otherwise, allow an abbreviated format utilizing guesses
     # Expected format is now:
-    #       {efu_binary}[;{calibration/file}[;{config/file}]][;{port}]
+    #       {efu_binary}[,{calibration/file}[,{config/file}]][,{port}]
     # That is, if you specify --efu, you must give its binary path and should
     # give its port. The calibration/file determines pixel calculations, so is more
     # likely to be needed. Finally, the config file can also be supplied to change, e.g.,
     # number of pixels or rings, etc.
-    parts = s.split(';')
+    parts = s.split(',')
     data = {'topic': TOPICS['event'], 'port': 9000, 'binary': ensure_executable(parts[0]),}
     data['name'] = data['binary'].stem
 
@@ -214,7 +214,7 @@ def make_services_parser():
     a('-v', '--version', action='version', version=__version__)
     # No need to specify the broker, or monitor source or topic names
     a('-b', '--broker', type=str, default=None, help='Kafka broker for all services', metavar='address:port')
-    a('--efu', type=efu_parameter, action='append', default=None, help='Configuration of one EFU, repeatable', metavar='name;calibration;config;port')
+    a('--efu', type=efu_parameter, action='append', default=None, help='Configuration of one EFU, repeatable', metavar='name,calibration,config,port')
     a('--writer-working-dir', type=str, default=None, help='Working directory for kafka-to-nexus')
     a('--writer-verbosity', type=str, default=None, help='Verbose output type (trace, debug, warning, error, critical)')
     a('--forwarder-verbosity', type=str, default=None,  help='Verbose output type (trace, debug, warning, error, critical)')
