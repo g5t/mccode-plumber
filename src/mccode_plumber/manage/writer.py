@@ -16,43 +16,45 @@ class KafkaToNexus(Manager):
                 command and job topics (localhost:9092)
     work:       the working directory for file output (`Path()`)
     command:    the topic used for receiving commands (WriterCommand)
-    job:        the topic used for receiving jobs (WriterJob)
+    pool:        the topic used for receiving jobs as part of a pool (WriterJob)
     verbosity:  the level of output to print to STDOUT, any of
                 (trace, debug, info, warning, error, critical)
     """
-    broker: str | None = None
+    broker: str
+    command: str
+    pool: str
     work: Path | None = None
-    command: str | None = None
-    job: str | None = None
     verbosity: str | None = None
     _command: Path = field(default_factory=lambda: Path('kafka-to-nexus'))
 
     def __post_init__(self):
         from mccode_plumber.kafka import register_kafka_topics, all_exist
         self._command = ensure_executable(self._command)
-        if self.broker is None:
-            self.broker = 'localhost:9092'
-        if self.command is None:
-            self.config = 'WriterCommand'
-        if self.job is None:
-            self.job = 'WriterJob'
-        self.work = ensure_writable_directory(self.work or Path())
-
-        res = register_kafka_topics(self.broker, [self.command, self.job])
+        self.work = ensure_writable_directory(self.work or Path()).resolve()
+        res = register_kafka_topics(self.broker, [self.command, self.pool])
         if not all_exist(res.values()):
             raise RuntimeError(f'Missing Kafka topics? {res}')
 
     def __run_command__(self) -> list[str]:
         args = [
             self._command.as_posix(),
-            '--brokers', self.broker,
+            '--brokers', f"{self.broker},{self.broker}",
             '--command-status-topic', self.command,
-            '--job-pool-topic', self.job,
+            '--job-pool-topic', self.pool,
+            #'--service-name', 'mpw',
             f'--hdf-output-prefix={self.work}/',
             '--kafka-error-timeout', '10s',
-            '--kafka-poll-timeout', '1s',
             '--kafka-metadata-max-timeout', '10s',
+            '--time-before-start', '10s',
         ]
-        if self.verbosity in ('critical', 'error', 'warning', 'info', 'debug', 'trace'):
-            args.extend(['--verbosity', self.verbosity])
+        if (v := writer_verbosity(self.verbosity)) is not None:
+            args.extend(['--verbosity', v])
         return args
+
+
+def writer_verbosity(v):
+    if isinstance(v, str):
+        for k in ('critical', 'error', 'warning', 'info', 'debug', 'trace'):
+            if k.lower() == v.lower():
+                return k
+    return None

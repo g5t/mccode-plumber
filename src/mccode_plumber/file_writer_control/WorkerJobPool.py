@@ -61,15 +61,10 @@ class WorkerJobPool(WorkerFinder):
         """
         See base class for documentation.
         """
-        print("Add job_id to command_channel")
         self.command_channel.add_job_id(job.job_id)
-        print("Add command_id to command_channel")
         self.command_channel.add_command_id(job.job_id, job.job_id)
-        print("Set command state to command_channel as WAITING_RESPONSE")
         self.command_channel.get_command(
             job.job_id
         ).state = CommandState.WAITING_RESPONSE
-        print(f"Send start message to pool")
         self._send_pool_message(job.get_start_message())
-        print("Return CommandHandler class")
         return CommandHandler(self.command_channel, job.job_id)

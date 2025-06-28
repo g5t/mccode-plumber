@@ -66,6 +66,14 @@ class Forwarder(Manager):
         ]
         if not self.retrieve:
             args.append('--skip-retrieval')
-        if self.verbosity in ('Trace', 'Debug', 'Warning', 'Error', 'Critical'):
-            args.extend(['-v', self.verbosity])
+        if (v:=forwarder_verbosity(self.verbosity)) is not None:
+            args.extend(['-v', v])
         return args
+
+
+def forwarder_verbosity(v):
+    if isinstance(v, str):
+        for k in ('Trace', 'Debug', 'Warning', 'Error', 'Critical'):
+            if k.lower() == v.lower():
+                return k
+    return None

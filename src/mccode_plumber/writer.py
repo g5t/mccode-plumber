@@ -187,6 +187,7 @@ def writer_start(
         broker,
         job_topic,
         command_topic,
+        control_topic,
         timeout,
         wait,
         job_id,
@@ -210,17 +211,21 @@ def writer_start(
     if stop_time_string is not None:
         end_time = datetime.fromisoformat(stop_time_string)
 
-    job = WriteJob(small_string, filename, broker, start_time, end_time, job_id=job_id or "")
+    job = WriteJob(small_string, filename, broker, start_time, end_time,
+                   job_id=job_id or "", control_topic=control_topic)
     # start the job
     start = handler.start_job(job)
+    # Did the job handler accomplish its job of sending the start message?
+    print(f'Writer start {handler.is_done()=} {handler.get_message()=}')
     if timeout is not None:
         try:
             # ensure the start succeeds:
             give_up_time = datetime.now() + timedelta(seconds=timeout)
             while not start.is_done():
+                state = start.get_state()
                 if give_up_time < datetime.now():
                     raise RuntimeError(f"Timed out while starting job {job.job_id}")
-                elif start.get_state() == CommandState.ERROR:
+                elif state == CommandState.ERROR:
                     raise RuntimeError(f"Starting job {job.job_id} failed with message {start.get_message()}")
                 sleep(1)
         except RuntimeError as e:
@@ -236,6 +241,7 @@ def start_pool_writer(
         broker: str | None = None,
         job_topic: str | None = None,
         command_topic: str | None = None,
+        control_topic: str | None = None,
         wait: bool = False,
         timeout: float | None = None,
         job_id: str | None = None
@@ -247,7 +253,7 @@ def start_pool_writer(
     try:
         start, handler = writer_start(
             start_time_string, structure, filename, stop_time_string,
-            broker, job_topic, command_topic, timeout, wait, job_id
+            broker, job_topic, command_topic, control_topic, timeout, wait, job_id
         )
         if wait:
             while not handler.is_done():
@@ -270,6 +276,7 @@ def get_arg_parser():
     a('-b', '--broker', type=str, help="The Kafka broker server used by the Writer")
     a('-j', '--job', type=str, help='Writer job topic')
     a('-c', '--command', type=str, help='Writer command topic')
+    a('-r', '--control', type=str, help='Active writer job control topic')
     a('--title', type=str, default='scan title for testing', help='Output file title parameter')
     a('--event-source', type=str)
     a('--event-topic', type=str)
@@ -333,10 +340,11 @@ def print_time():
 
 
 def start_writer():
-    args, parameters, structure = parse_writer_args()
-    return start_pool_writer(args.start_time, structure, args.filename, stop_time_string=args.stop_time,
-                             broker=args.broker, job_topic=args.job, command_topic=args.command,
-                             wait=args.wait, timeout=args.time_out, job_id=args.job_id)
+    a, parameters, structure = parse_writer_args()
+    return start_pool_writer(
+        a.start_time, structure, a.filename, stop_time_string=a.stop_time,
+        broker=a.broker, job_topic=a.job, command_topic=a.command,
+        control_topic=a.control, wait=a.wait, timeout=a.time_out, job_id=a.job_id)
 
 
 def wait_on_writer():

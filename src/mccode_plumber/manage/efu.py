@@ -6,6 +6,61 @@ from .manager import Manager
 from .ensure import ensure_readable_file, ensure_executable
 
 @dataclass
+class EventFormationUnitConfig:
+    name: str
+    binary: Path
+    config: Path
+    calibration: Path
+    topic: str
+    samples_topic: str
+    port: int
+    monitor_every: int
+    monitor_consecutive: int
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        required = ('binary', 'config', 'calibration', 'topic', 'port')
+        if any(req not in data for req in required):
+            msg = [req for req in required if req not in data]
+            msg = ', '.join(msg)
+            raise ValueError(f"Missing required value{'' if len(msg)==1 else 's'}: {msg}")
+        binary = ensure_readable_file(data['binary'])
+        config = ensure_readable_file(data['config'])
+        calibration = ensure_readable_file(data['calibration'])
+        topic = data['topic']
+        port = int(data['port'])
+        monitor_every = int(data.get('monitor_every', 1000))
+        monitor_consecutive = int(data.get('monitor_consecutive', 2))
+        name = data.get('name', binary.stem)
+        samples_topic = data.get('samples_topic', f'{topic}_samples')
+        return cls(name, binary, config, calibration, topic, samples_topic, port, monitor_every, monitor_consecutive)
+
+    def to_dict(self):
+        d = {
+            'name': self.name,
+            'binary': self.binary.as_posix(),
+            'config': self.config.as_posix(),
+            'calibration': self.calibration.as_posix(),
+            'topic': self.topic,
+            'samples_topic': self.samples_topic,
+            'port': self.port,
+            'monitor_every': self.monitor_every,
+            'monitor_consecutive': self.monitor_consecutive,
+        }
+        return d
+
+    def to_cli_str(self):
+        from json import dumps
+        return dumps(self.to_dict()).translate(str.maketrans(',',';',' {}"'))
+
+    @classmethod
+    def from_cli_str(cls, cli_str: str):
+        data ={k: v for k, v in [z.split(':') for z in [x for x in cli_str.split(';')]]}
+        return cls.from_dict(data)
+
+
+
+@dataclass
 class EventFormationUnit(Manager):
     """
     Command and control of an Event Formation Unit

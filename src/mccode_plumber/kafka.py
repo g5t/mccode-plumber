@@ -30,7 +30,16 @@ def parse_kafka_topic_args():
 def register_kafka_topics(broker: str, topics: list[str]):
     from confluent_kafka.admin import AdminClient, NewTopic
     client = AdminClient({"bootstrap.servers": broker})
-    new_ts = [NewTopic(t, num_partitions=1, replication_factor=1) for t in topics]
+    config = {
+        # 'cleanup.policy': 'delete',
+        # 'delete.retention.ms': 60000,
+        'max.message.bytes': 104857600,
+        # 'retention.bytes': 10737418240,
+        # 'retention.ms': 30000,
+        # 'segment.bytes': 104857600,
+        # 'segment.ms': 60000
+    }
+    new_ts = [NewTopic(t, num_partitions=1, replication_factor=1, config=config) for t in topics]
     futures = client.create_topics(new_ts)
     results = {}
     for topic, future in futures.items():
