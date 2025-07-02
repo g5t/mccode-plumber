@@ -170,6 +170,11 @@ def get_instr_name_and_parameters(file: str | Path):
         from mccode_antlr.loader import load_mcstas_instr
         instr = load_mcstas_instr(file)
         return instr.name, instr.parameters
+    elif file.suffix.lower() == '.json':
+        # No shortcuts, but much faster
+        from mccode_antlr.io.json import load_json
+        instr = load_json(file)
+        return instr.name, instr.parameters
 
     raise ValueError('Unsupported file extension')
 
