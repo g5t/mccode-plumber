@@ -1,5 +1,12 @@
 import unittest
 
+# FIXME These tests exercise internal details of the splitrun parser,
+#       which we don't depend on since we _always_ call `parse_splitrun({our parser}`)
+#       which rearranges ArgParse's results before returning
+#       (args, parameters, precision) therefore, directly checking the ArgParse result
+#       is fraught and these tests may fail at any internal change in restage
+# TODO  A future restage release will include an `args_fixup` function that can be used
+#       to get the correct output args of `parse_splitrun` in our testing here.
 
 class SplitrunTestCase(unittest.TestCase):
     def test_parsing(self):
@@ -9,7 +16,7 @@ class SplitrunTestCase(unittest.TestCase):
         self.assertEqual(args.instrument, 'inst.h5')
         self.assertEqual(args.broker, 'l:9092')
         self.assertEqual(args.source, 'm')
-        self.assertEqual(args.ncount, 10000)
+        self.assertEqual(args.ncount, (None, 10000, None))
         self.assertEqual(args.parameters, ['a=1:4', 'b=2:5'])
         self.assertFalse(args.parallel)
 
@@ -40,7 +47,7 @@ class SplitrunTestCase(unittest.TestCase):
         self.assertEqual(args.instrument, 'inst.h5')
         self.assertEqual(args.broker, 'www.github.com:9093')
         self.assertEqual(args.source, 'dev/null')
-        self.assertEqual(args.ncount, 123)
+        self.assertEqual(args.ncount, (None, 123, None))
         self.assertEqual(args.parameters, ['a=1:4', 'b=2:5'])
         self.assertTrue(args.parallel)
 
