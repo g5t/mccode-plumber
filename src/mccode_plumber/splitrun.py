@@ -27,6 +27,6 @@ def main():
     from .mccode import get_mcstas_instr
     from restage.splitrun import splitrun_args, parse_splitrun
     args, parameters, precision = parse_splitrun(make_parser())
-    instr = get_mcstas_instr(args.instrument[0])
+    instr = get_mcstas_instr(args.instrument)
     callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker, args.source, args.topic)
     return splitrun_args(instr, parameters, precision, args, callback=callback, callback_arguments=callback_args)

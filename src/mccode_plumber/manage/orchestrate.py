@@ -357,9 +357,9 @@ def main():
     from restage.splitrun import parse_splitrun
     from mccode_plumber.splitrun import monitors_to_kafka_callback_with_arguments
     args, parameters, precision = parse_splitrun(make_splitrun_nexus_parser())
-    instr = get_mcstas_instr(args.instrument[0])
+    instr = get_mcstas_instr(args.instrument)
 
-    structure = load_file_json(args.structure if args.structure else Path(args.instrument[0]).with_suffix('.json'))
+    structure = load_file_json(args.structure if args.structure else Path(args.instrument).with_suffix('.json'))
     broker = 'localhost:9092'
     monitor_source = 'mccode-to-kafka'
     callback_topics = get_topics_json(structure)  # all structure-topics might be monitor topics?
