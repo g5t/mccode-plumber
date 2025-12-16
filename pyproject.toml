@@ -8,9 +8,9 @@ dependencies = [
     'p4p',
     'kafka-python>=2.2.11',
     'ess-streaming-data-types>=0.14.0',
-    'restage>=0.8.3',
+    'restage>=0.9.0',
     'mccode-to-kafka>=0.2.2',
-    'moreniius>=0.5.2',
+    'moreniius>=0.6.0',
     'icecream',
     'ephemeral-port-reserve',
 ]
@@ -28,6 +28,7 @@ mp-splitrun = 'mccode_plumber.splitrun:main'
 mp-epics = 'mccode_plumber.epics:run'
 mp-epics-strings = 'mccode_plumber.epics:run_strings'
 mp-epics-update = 'mccode_plumber.epics:update'
+mp-epics-watch = 'mccode_plumber.epics_watcher:run_instr'
 mp-forwarder-setup = 'mccode_plumber.forwarder:setup'
 mp-forwarder-teardown = 'mccode_plumber.forwarder:teardown'
 mp-writer-from = 'mccode_plumber.writer:print_time'
