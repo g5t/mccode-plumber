@@ -121,31 +121,31 @@ def start_writer(start_time: datetime,
     return job_id, success
 
 
-def get_topics_iter(data: list | tuple):
+def get_stream_pairs_list(data: list | tuple):
     topics = set()
     for entry in data:
         if isinstance(entry, dict):
-            topics.update(get_topics_dict(entry))
+            topics.update(get_stream_pairs_dict(entry))
         elif isinstance(entry, (list, tuple)):
-            topics.update(get_topics_iter(entry))
+            topics.update(get_stream_pairs_list(entry))
     return topics
 
 
-def get_topics_dict(data: dict):
+def get_stream_pairs_dict(data: dict):
     topics = set()
+    if all(k in data for k in ('topic', 'source')):
+        topics.add((data['topic'], data['source']))
     for k, v in data.items():
         if isinstance(v, dict):
-            topics.update(get_topics_dict(v))
+            topics.update(get_stream_pairs_dict(v))
         elif isinstance(v, (list, tuple)):
-            topics.update(get_topics_iter(list(v)))
-        elif k == 'topic':
-            topics.add(v)
+            topics.update(get_stream_pairs_list(list(v)))
     return topics
 
 
-def get_topics_json(data: dict) -> list[str]:
-    """Traverse a loaded JSON object and return the found list of topic names"""
-    return list(get_topics_dict(data))
+def get_stream_pairs(data: dict) -> list[tuple[str, str]]:
+    """Traverse a loaded JSON object and return the found list of (topic, source) pairs."""
+    return list(get_stream_pairs_dict(data))
 
 
 def load_file_json(file: str | Path):
@@ -360,16 +360,22 @@ def main():
     instr = get_mcstas_instr(args.instrument)
 
     structure = load_file_json(args.structure if args.structure else Path(args.instrument).with_suffix('.json'))
-    broker = 'localhost:9092'
-    monitor_source = 'mccode-to-kafka'
-    callback_topics = get_topics_json(structure)  # all structure-topics might be monitor topics?
-    if len(callback_topics):
-        print(f'register {callback_topics}')
-        register_topics(broker, callback_topics) # ensure the topics are known to Kafka
-    else:
-        print('no callback topics registered')
 
-    callback, callback_args = monitors_to_kafka_callback_with_arguments(broker, monitor_source, callback_topics)
+    streams = get_stream_pairs(structure)
+    # All monitors should use a single topic:
+    monitor_topic = f'{instr.name}_beam_monitor'
+    if {monitor_topic} != {s[0] for s in streams}:
+        raise ValueError(f'All monitor streams must use the same topic {monitor_topic}, found {streams}')
+    monitor_names = [s[1] for s in streams]
+
+    broker = 'localhost:9092'
+    # monitor_source = 'mccode-to-kafka'  # old-style single source multi-topic
+    register_topics(broker, [monitor_topic]) # ensure the topics are known to Kafka
+
+    # Configure the callback to send monitor data to Kafka, using the common topic with source names as monitor names
+    callback, callback_args = monitors_to_kafka_callback_with_arguments(
+        broker=broker, topic=monitor_topic, source=None, names=monitor_names
+    )
     splitrun_kwargs = {
         'args': args, 'parameters': parameters, 'precision': precision,
         'callback': callback, 'callback_arguments': callback_args,
