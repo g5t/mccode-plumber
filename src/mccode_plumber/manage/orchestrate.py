@@ -364,13 +364,10 @@ def main():
     streams = get_stream_pairs(structure)
     # All monitors should use a single topic:
     monitor_topic = f'{instr.name}_beam_monitor'
-    if {monitor_topic} != {s[0] for s in streams}:
-        raise ValueError(f'All monitor streams must use the same topic {monitor_topic}, found {streams}')
-    monitor_names = [s[1] for s in streams]
+    monitor_names = [s[1] for s in streams if s[0] == monitor_topic]
 
     broker = 'localhost:9092'
-    # monitor_source = 'mccode-to-kafka'  # old-style single source multi-topic
-    register_topics(broker, [monitor_topic]) # ensure the topics are known to Kafka
+    register_topics(broker, [s[0] for s in streams]) # ensure all topics are known to Kafka
 
     # Configure the callback to send monitor data to Kafka, using the common topic with source names as monitor names
     callback, callback_args = monitors_to_kafka_callback_with_arguments(
