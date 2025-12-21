@@ -60,3 +60,7 @@ def test_monitor_streams():
 
     assert topics == {'bifrost_beam_monitor'}
     assert sources == {f'{x}_monitor' for x in ['psc', 'overlap', 'bandwidth', 'normalization']}
+
+
+if __name__ == '__main__':
+    test_monitor_streams()
