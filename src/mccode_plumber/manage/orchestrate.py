@@ -367,7 +367,8 @@ def main():
     monitor_names = [s[1] for s in streams if s[0] == monitor_topic]
 
     broker = 'localhost:9092'
-    register_topics(broker, [s[0] for s in streams]) # ensure all topics are known to Kafka
+    topics = list({s[0] for s in streams}) # ensure all topics are known to Kafka
+    register_topics(broker, topics)
 
     # Configure the callback to send monitor data to Kafka, using the common topic with source names as monitor names
     callback, callback_args = monitors_to_kafka_callback_with_arguments(
