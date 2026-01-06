@@ -29,5 +29,5 @@ jobs:
 
     - name: Test
       run: |
-        python -m pip install pytest niess
+        python -m pip install pytest "niess>=0.1.4"
         python -m pytest

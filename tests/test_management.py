@@ -1,7 +1,16 @@
+import os
 import time
+import pytest
 from pathlib import Path
 from ephemeral_port_reserve import reserve
 from mccode_plumber.manage import EventFormationUnit
+
+
+def command_args(*args):
+    largs = [a if isinstance(a, str) else str(a) for a in args]
+    if os.name == 'nt':
+        return ["python"] + largs
+    return largs
 
 
 def assert_faker_working(port, message, retries=5, timeout=0.1):
@@ -9,7 +18,7 @@ def assert_faker_working(port, message, retries=5, timeout=0.1):
     binary = Path(__file__).resolve().parent / 'fake_manager.py'
     res = 'Not-run yet'
     for _ in range(retries):
-        res = run([str(binary), str(port), message], capture_output=True, text=True)
+        res = run(command_args(binary, port, message), capture_output=True, text=True)
         if res.returncode == 0:
             return res.stdout.strip() == message
         time.sleep(timeout)
@@ -21,7 +30,7 @@ def test_all_fake():
     from subprocess import Popen
     port = reserve()
     binary = Path(__file__).resolve().parent / 'fake_efu.py'
-    proc = Popen([str(binary), '--cmdport', str(port)])
+    proc = Popen(command_args(binary, '--cmdport', port))
     time.sleep(0.1) # startup
     assert proc.poll() is None # ensure it's still running
     assert assert_faker_working(port, "fake it till you make it")
@@ -30,6 +39,7 @@ def test_all_fake():
     assert proc.poll() is not None
 
 
+@pytest.mark.skipif(os.name == 'nt', reason="fake_efu.py needs the python")
 def test_efu_management():
     service = EventFormationUnit.start(
         binary=Path(__file__).parent / "fake_efu.py",
@@ -47,6 +57,7 @@ def test_efu_management():
     service.stop()
 
 
+@pytest.mark.skipif(os.name == 'nt', reason="fake_efu.py needs the python")
 def test_minimal_efu_management():
     service = EventFormationUnit.start(
         binary=Path(__file__).parent / "fake_efu.py",
