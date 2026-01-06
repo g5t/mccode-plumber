@@ -16,8 +16,9 @@ class SplitrunTestCase(unittest.TestCase):
 
     def test_mixed_order_throws(self):
         parser = make_parser()
-        parser.prog = "{{This failed before but works now? Why did it stop throwing?}}"
-        pa = parser.parse_args
+        parser.prog = "{{This failed before Python 3.12}}"
+        # Pre Python 3.12 was more-strict about argument position mixing
+        pa = getattr(parser, "parse_intermixed_args", parser.parse_args)
         # These also output usage information to stdout -- don't be surprised by the 'extra' test output.
         pa(['inst.h5', '--broker', 'l:9092', '--source', 'm', '-n', '10000',
             'a=1:4', 'b=2:5'

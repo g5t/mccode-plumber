@@ -7,7 +7,23 @@ def message(mode) -> str:
 
 def ensure_executable(path: str| Path) -> Path:
     from shutil import which
-    found = which(path)
+    import os
+    p = Path(path)
+    # If the path exists as given, accept it (handles absolute and relative files)
+    if p.exists():
+        return p
+
+    # On Windows try PATHEXT extensions for provided path (handles .py etc.)
+    if os.name == "nt":
+        pathext = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD;.PY;.PYW").split(
+            os.pathsep)
+        for ext in pathext:
+            candidate = Path(str(p) + ext)
+            if candidate.exists():
+                return candidate
+
+    # Fallback to shutil.which (searches PATH and PATHEXT)
+    found = which(str(path))
     if found is None:
         raise FileNotFoundError(path)
     return Path(found)
