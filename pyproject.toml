@@ -30,7 +30,7 @@ classifiers = [
 dynamic = ['version']
 
 [project.optional-dependencies]
-test = ["pytest", "niess>=0.1.4"]
+test = ["pytest", "niess>=0.1.0"]
 
 [project.scripts]
 mp-splitrun = 'mccode_plumber.splitrun:main'
@@ -66,7 +66,7 @@ legacy_tox_ini = """
     [testenv]
     deps =
         pytest
-        niess>=0.1.4
+        niess>=0.1.0
     commands = pytest tests
 
     [testenv:type]
