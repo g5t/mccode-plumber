@@ -1,11 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from pathlib import Path
-from multiprocessing import Process, Pipe
-from multiprocessing.connection import Connection
+from subprocess import Popen, PIPE
+from threading import Thread
 from enum import Enum
 from colorama import Fore, Back, Style
 from colorama.ansi import AnsiStyle
+
 
 class IOType(Enum):
     stdout = 1
@@ -19,13 +19,13 @@ class Manager:
 
     Properties
     ----------
-    _process:   a multiprocessing.Process instance, which is undefined for a short
-                period during instance creation inside the `start` class method
+    _process:   a subprocess.Popen instance
     """
     name: str
     style: AnsiStyle
-    _process: Process | None
-    _connection: Connection | None
+    _process: Popen | None
+    _stdout_thread: Thread | None
+    _stderr_thread: Thread | None
 
     def __run_command__(self) -> list[str]:
         return []
@@ -38,77 +38,86 @@ class Manager:
         from dataclasses import fields
         return [field.name for field in fields(cls)]
 
+    def _read_stream(self, stream, io_type: IOType):
+        """Read lines from stream and print them until EOF.
+
+        This replaces the previous behaviour of sending lines over a
+        multiprocessing Connection. Printing directly from the reader
+        threads is sufficient because the manager previously only used
+        the connection to relay subprocess stdout/stderr back to the
+        parent process for display.
+        """
+        try:
+            for line in iter(stream.readline, ''):
+                if not line:
+                    break
+                # format and print the line, preserving original behaviour
+                formatted = f'{self.style}{self.name}:{Style.RESET_ALL} {line}'
+                if io_type == IOType.stdout:
+                    print(formatted, end='')
+                else:
+                    from sys import stderr
+                    print(formatted, file=stderr, end='')
+        except ValueError:
+            pass  # stream closed
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                pass
+
     @classmethod
     def start(cls, **config):
         names = cls.fieldnames()
         kwargs = {k: config[k] for k in names if k in config}
         if any(k not in names for k in config):
             raise ValueError(f'{config} expected to contain only {names}')
-        if '_process' not in kwargs:
-            kwargs['_process'] = None
-        if '_connection' not in kwargs:
-            kwargs['_connection'] = None
+        for p in ('_process', '_stdout_thread', '_stderr_thread'):
+            if p not in kwargs:
+                kwargs[p] = None
         if 'name' not in kwargs:
             kwargs['name'] = 'Managed process'
         if 'style' not in kwargs:
             kwargs['style'] = Fore.WHITE + Back.BLACK
+
         manager = cls(**kwargs)
-        manager._connection, child_conn = Pipe()
-        manager._process = Process(target=manager.run, args=(child_conn,))
-        manager._process.start()
+
+        argv = manager.__run_command__()
+        shell = isinstance(argv, str)
+        # announce start directly instead of sending via a Connection
+        print(f'Starting {argv if shell else " ".join(argv)}')
+
+        manager._process = Popen(
+            argv, shell=shell, stdout=PIPE, stderr=PIPE, bufsize=1,
+            universal_newlines=True,
+        )
+        manager._stdout_thread = Thread(
+            target=manager._read_stream,
+            args=(manager._process.stdout, IOType.stdout),
+            daemon=True,
+        )
+        manager._stderr_thread = Thread(
+            target=manager._read_stream,
+            args=(manager._process.stderr, IOType.stderr),
+            daemon=True,
+        )
+        manager._stdout_thread.start()
+        manager._stderr_thread.start()
         return manager
 
     def stop(self):
         self.finalize()
-        self._process.terminate()
+        if self._process:
+            self._process.terminate()
+            self._process.wait()
 
     def poll(self):
-        from sys import stderr
-        attn = Fore.BLACK + Back.RED + Style.BRIGHT
-        # check for anything received on our end of the connection
-        while self._connection.poll():
-            # examine what was returned:
-            try:
-                ret = self._connection.recv()
-            except EOFError:
-                print(f'{attn}{self.name}: [unexpected halt]{Style.RESET_ALL}')
-                return False
-            if len(ret) == 2:
-                t, line = ret
-                line = f'{self.style}{self.name}:{Style.RESET_ALL} {line}'
-                if t == IOType.stdout:
-                    print(line, end='')
-                else:
-                    print(line, file=stderr, end='')
-            else:
-                print(f'{attn}{self.name}: [unknown received data on connection]{Style.RESET_ALL}')
-        return self._process.is_alive()
+        """Check whether the managed process is still running.
 
-    def run(self, conn):
-        from subprocess import Popen, PIPE
-        from select import select
-        argv = self.__run_command__()
-
-        shell = isinstance(argv, str)
-        conn.send((IOType.stdout, f'Starting {argv if shell else " ".join(argv)}\n'))
-        process = Popen(argv, shell=shell, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True, )
-        out, err = process.stdout.fileno(), process.stderr.fileno()
-        check = [process.stdout, process.stderr]
-        while process.poll() is None:
-            r, w, x = select(check, [], check, 0.5,)
-            for stream in r:
-                if stream.fileno() == out:
-                    conn.send((IOType.stdout, process.stdout.readline()))
-                elif stream.fileno() == err:
-                    conn.send((IOType.stderr, process.stderr.readline()))
-            for stream in x:
-                if stream.fileno() == out:
-                    conn.send((IOType.stdout, "EXCEPTION ON STDOUT"))
-                elif stream.fileno() == err:
-                    conn.send((IOType.stderr, "EXCEPTION ON STDERR"))
-        # Process finished, but the buffers may still contain data:
-        for stream in check:
-            if stream.fileno() == out:
-                map(lambda line: conn.send(IOType.stdout, line), stream.readlines())
-            elif stream.fileno() == err:
-                map(lambda line: conn.send(IOType.stderr, line), stream.readlines())
+        Previously this drained and printed any messages received over a
+        multiprocessing Connection. Reader threads now handle printing,
+        so poll only needs to report process liveness.
+        """
+        if not self._process:
+            return False
+        return self._process.poll() is None
