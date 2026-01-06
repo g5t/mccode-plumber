@@ -16,7 +16,7 @@ class WorkerState(Enum):
     UNAVAILABLE = auto()
 
 
-class WorkerStatus(object):
+class WorkerStatus:
     """
     Contains general status information about a worker.
     """
@@ -27,9 +27,9 @@ class WorkerStatus(object):
         self._timeout = timeout
         self._state = WorkerState.UNAVAILABLE
 
-    def __eq__(self, other_status: "WorkerStatus") -> bool:
+    def __eq__(self, other_status) -> bool:
         if not isinstance(other_status, WorkerStatus):
-            raise NotImplementedError
+            return NotImplemented
         return (
             self.service_id == other_status.service_id
             and self.state == other_status.state
@@ -55,17 +55,10 @@ class WorkerStatus(object):
         """
         if (
             self.state != WorkerState.UNAVAILABLE
-            and current_time - self.last_update > self._timeout
+            and self._timeout and current_time - self.last_update > self._timeout
         ):
             self._state = WorkerState.UNAVAILABLE
             self._last_update = current_time
-
-    @property
-    def state(self) -> WorkerState:
-        """
-        The current state of the worker.
-        """
-        return self._state
 
     @property
     def service_id(self) -> str:
@@ -82,7 +75,13 @@ class WorkerStatus(object):
         """
         return self._last_update
 
+    @property
+    def state(self) -> WorkerState:
+        return self._state
+
     @state.setter
     def state(self, new_state: WorkerState):
         self._last_update = datetime.now()
         self._state = new_state
+
+

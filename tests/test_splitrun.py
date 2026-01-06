@@ -64,6 +64,11 @@ class SplitrunTestCase(unittest.TestCase):
         self.assertEqual(args.nmin, 1)
         self.assertEqual(args.nmax, 2**20)
 
+    def test_parsing_with_explicit_list(self):
+        parser = make_parser()
+        args = args_fixup(parser.parse_args(['--broker', 'l:9092', '--source', 'm', '-n', '10000', 'inst.h5', '--', 'a=1:4', 'b=2:5', 'c=1,2,3,4,5']))
+        self.assertEqual(args.parameters, ['a=1:4', 'b=2:5', 'c=1,2,3,4,5'])
+
 
 if __name__ == '__main__':
     unittest.main()

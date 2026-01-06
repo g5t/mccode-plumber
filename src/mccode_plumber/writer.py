@@ -137,7 +137,7 @@ def insert_events_in_nexus_structure(ns: dict, config: dict):
     return ns
 
 
-def get_writer_pool(broker: str = None, job: str = None, command: str = None):
+def get_writer_pool(broker: str | None = None, job: str | None = None, command: str | None = None):
     from .file_writer_control import WorkerJobPool
     print(f'Create a Writer pool for {broker=} {job=} {command=}')
     pool = WorkerJobPool(f"{broker}/{job}", f"{broker}/{command}")
@@ -151,17 +151,17 @@ def make_define_nexus_structure():
     def define_nexus_structure(
             instr: Path | str,
             pvs: list[dict],
-            title: str = None,
-            event_stream: dict[str, str] = None,
+            title: str | None = None,
+            event_stream: dict[str, str] | None = None,
             file: Path | None = None,
             func: Callable[[Instr], dict] | None = None,
             binary: Path | None = None,
-            origin: str = None):
+            origin: str | None = None):
         import json
         from .mccode import get_mcstas_instr
         if file is not None and file.exists():
-            with open(file, 'r') as file:
-                nexus_structure = json.load(file)
+            with open(file, 'r') as f:
+                nexus_structure = json.load(f)
         elif func is not None:
             nexus_structure = func(get_mcstas_instr(instr))
         elif binary is not None and binary.exists():
@@ -173,7 +173,7 @@ def make_define_nexus_structure():
         else:
             nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
         nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
-        nexus_structure = add_title_to_nexus_structure(nexus_structure, title)
+        nexus_structure = add_title_to_nexus_structure(nexus_structure, title or 'Unknown title')
         # nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
         return nexus_structure
     return define_nexus_structure

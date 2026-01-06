@@ -35,20 +35,26 @@ class Forwarder(Manager):
     retrieve: bool = False
     verbosity: str | None = None
     _command: Path = field(default_factory=lambda: Path('forwarder-launch'))
+    _broker: str = field(default='localhost:9092')
+    _config: str = field(default='ForwardConfig')
+    _status: str = field(default='ForwardStatus')
 
     def __post_init__(self):
         from mccode_plumber.kafka import register_kafka_topics, all_exist
         self._command =ensure_executable(self._command)
         if self.broker is None:
-            self.broker = 'localhost:9092'
+            self.broker = self._broker
         if self.config is None:
-            self.config = 'ForwardConfig'
+            self.config = self._config
         if self.status is None:
-            self.status = 'ForwardStatus'
+            self.status = self._status
         if '/' not in self.config:
             self.config = f'{self.broker}/{self.config}'
         if '/' not in self.status:
             self.status = f'{self.broker}/{self.status}'
+        self._broker = self.broker
+        self._config = self.config
+        self._status = self.status
 
         for broker_topic in (self.config, self.status):
             b, t = broker_topic.split('/')
@@ -58,11 +64,11 @@ class Forwarder(Manager):
 
 
     def __run_command__(self) -> list[str]:
-        args = [
+        args: list[str] = [
             self._command.as_posix(),
-            '--config-topic', self.config,
-            '--status-topic', self.status,
-            '--output-broker', self.broker,
+            '--config-topic', self._config,
+            '--status-topic', self._status,
+            '--output-broker', self._broker,
         ]
         if not self.retrieve:
             args.append('--skip-retrieval')

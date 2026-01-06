@@ -5,6 +5,7 @@ from multiprocessing import Process, Pipe
 from multiprocessing.connection import Connection
 from enum import Enum
 from colorama import Fore, Back, Style
+from colorama.ansi import AnsiStyle
 
 class IOType(Enum):
     stdout = 1
@@ -22,12 +23,12 @@ class Manager:
                 period during instance creation inside the `start` class method
     """
     name: str
-    style: Style
+    style: AnsiStyle
     _process: Process | None
     _connection: Connection | None
 
     def __run_command__(self) -> list[str]:
-        pass
+        return []
 
     def finalize(self):
         pass

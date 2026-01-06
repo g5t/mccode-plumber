@@ -33,7 +33,7 @@ def register_kafka_topics(broker: str, topics: list[str]):
     config = {
         # 'cleanup.policy': 'delete',
         # 'delete.retention.ms': 60000,
-        'max.message.bytes': 104857600,
+        'max.message.bytes': '104857600',
         # 'retention.bytes': 10737418240,
         # 'retention.ms': 30000,
         # 'segment.bytes': 104857600,

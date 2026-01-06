@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 from p4p.nt import NTScalar
 from p4p.server import Server, StaticProvider
 from p4p.server.thread import SharedPV
@@ -96,7 +98,7 @@ def parse_args():
     return parameters, args
 
 
-def main(names: dict[str, NTScalar], prefix: str = None, filename_required: bool = True):
+def main(names: dict[str, NTScalar], prefix: str | None = None, filename_required: bool = True):
     provider = StaticProvider('mailbox')  # 'mailbox' is an arbitrary name
 
     if filename_required and 'mcpl_filename' not in names:
@@ -118,7 +120,7 @@ def run():
     main(parameters, prefix=args.prefix)
 
 
-def start(parameters, prefix: str = None):
+def start(parameters, prefix: str | None = None):
     from multiprocessing import Process
     proc = Process(target=main, args=(parameters, prefix))
     proc.start()

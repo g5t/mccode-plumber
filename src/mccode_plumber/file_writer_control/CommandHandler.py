@@ -32,7 +32,10 @@ class CommandHandler:
         """
         :return: True if the command completed successfully. False otherwise.
         """
-        current_state = self.command_channel.get_command(self.command_id).state
+        command = self.command_channel.get_command(self.command_id)
+        if command is None:
+            return False
+        current_state = command.state
         if current_state == CommandState.ERROR:
             raise RuntimeError(
                 f'Command failed with error message "{self.get_message()}".'
@@ -52,7 +55,10 @@ class CommandHandler:
         return command.message
 
     def set_timeout(self, new_timeout: timedelta):
-        self.command_channel.get_command(self.command_id).timeout = new_timeout
+        if command := self.command_channel.get_command(self.command_id):
+            command.timeout = new_timeout
 
     def get_timeout(self):
-        return self.command_channel.get_command(self.command_id).timeout
+        if command := self.command_channel.get_command(self.command_id):
+            return command.timeout
+        return None

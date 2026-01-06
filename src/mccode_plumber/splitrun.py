@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import Union
+
+
 def make_parser():
     from mccode_plumber import __version__
     from restage.splitrun import make_splitrun_parser
@@ -16,7 +21,7 @@ def monitors_to_kafka_callback_with_arguments(
 ):
     from mccode_to_kafka.sender import send_histograms
 
-    partial_kwargs = {'broker': broker}
+    partial_kwargs: dict[str, Union[str,list[str]]] = {'broker': broker}
     if topic is not None and source is not None and names is not None and len(names) > 1:
         raise ValueError("Cannot specify both topic/source and multiple names simultaneously.")
 

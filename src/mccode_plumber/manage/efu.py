@@ -21,9 +21,10 @@ class EventFormationUnitConfig:
     def from_dict(cls, data: dict):
         required = ('binary', 'config', 'calibration', 'topic', 'port')
         if any(req not in data for req in required):
-            msg = [req for req in required if req not in data]
-            msg = ', '.join(msg)
-            raise ValueError(f"Missing required value{'' if len(msg)==1 else 's'}: {msg}")
+            missing = [req for req in required if req not in data]
+            msg = ', '.join(missing)
+            val = f"value{'' if len(missing) == 1 else 's'}"
+            raise ValueError(f"Missing required {val}: {msg}")
         binary = ensure_readable_file(data['binary'])
         config = ensure_readable_file(data['config'])
         calibration = ensure_readable_file(data['calibration'])
