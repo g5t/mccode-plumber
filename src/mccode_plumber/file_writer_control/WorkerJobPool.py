@@ -63,8 +63,7 @@ class WorkerJobPool(WorkerFinder):
         """
         self.command_channel.add_job_id(job.job_id)
         self.command_channel.add_command_id(job.job_id, job.job_id)
-        self.command_channel.get_command(
-            job.job_id
-        ).state = CommandState.WAITING_RESPONSE
+        if command := self.command_channel.get_command(job.job_id):
+            command.state = CommandState.WAITING_RESPONSE
         self._send_pool_message(job.get_start_message())
         return CommandHandler(self.command_channel, job.job_id)

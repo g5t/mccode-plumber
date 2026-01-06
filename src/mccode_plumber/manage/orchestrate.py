@@ -17,17 +17,17 @@ TOPICS = {
 }
 PREFIX = 'mcstas:'
 
-def guess_instr_config(name: str):
+def guess_instr_config(name: str) -> Path:
     guess = f'/event-formation-unit/configs/{name}/configs/{name}.json'
     return ensure_readable_file(Path(guess))
 
 
-def guess_instr_calibration(name: str):
+def guess_instr_calibration(name: str) -> Path:
     guess = f'/event-formation-unit/configs/{name}/configs/{name}nullcalib.json'
     return ensure_readable_file(Path(guess))
 
 
-def guess_instr_efu(name: str):
+def guess_instr_efu(name: str) -> Path:
     guess = name.split('_')[0].split('.')[0].split('-')[0].lower()
     return ensure_executable(Path(guess))
 
@@ -193,8 +193,10 @@ def efu_parameter(s: str):
     # likely to be needed. Finally, the config file can also be supplied to change, e.g.,
     # number of pixels or rings, etc.
     parts = s.split(',')
-    data = {'topic': TOPICS['event'], 'port': 9000, 'binary': ensure_executable(parts[0]),}
-    data['name'] = data['binary'].stem
+    binary: Path = ensure_executable(parts[0])
+    data : dict[str, int | str | Path] = {
+        'topic': TOPICS['event'], 'port': 9000, 'binary': binary, 'name': binary.stem
+    }
 
     if len(parts) > 1 and (len(parts) > 2 or not parts[1].isnumeric()):
         data['calibration'] = parts[1]

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import Dict, Optional
@@ -48,7 +50,7 @@ class JobStatus:
         if new_status.message:
             self._message = new_status.message
         self._service_id = new_status.service_id
-        self._file_name = new_status.file_name
+        self._file_name = new_status.file_name or ""
         self._last_update = new_status.last_update
         self._metadata = new_status.metadata
 
@@ -61,7 +63,7 @@ class JobStatus:
             self.state != JobState.DONE
             and self.state != JobState.ERROR
             and self.state != JobState.TIMEOUT
-            and current_time - self.last_update > self._timeout
+            and self._timeout and current_time - self.last_update > self._timeout
         ):
             self._state = JobState.TIMEOUT
             self._last_update = current_time
@@ -106,8 +108,13 @@ class JobStatus:
         """
         return self._state
 
+    @state.setter
+    def state(self, new_state: JobState) -> None:
+        self._state = new_state
+        self._last_update = datetime.now()
+
     @property
-    def file_name(self) -> str:
+    def file_name(self) -> str | None:
         """
         The file name of the job. None if the file name is not known.
         """
@@ -120,17 +127,18 @@ class JobStatus:
         self._file_name = new_file_name
         self._last_update = datetime.now()
 
-    @state.setter
-    def state(self, new_state: JobState) -> None:
-        self._state = new_state
-        self._last_update = datetime.now()
-
     @property
     def message(self) -> str:
         """
         Status/state message of the job as received from the file-writer.
         """
         return self._message
+
+    @message.setter
+    def message(self, new_message: str) -> None:
+        if new_message:
+            self._message = new_message
+            self._last_update = datetime.now()
 
     @property
     def metadata(self) -> Optional[Dict]:
@@ -140,8 +148,3 @@ class JobStatus:
     def metadata(self, metadata: Dict) -> None:
         self._metadata = metadata
 
-    @message.setter
-    def message(self, new_message: str) -> None:
-        if new_message:
-            self._message = new_message
-            self._last_update = datetime.now()

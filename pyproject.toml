@@ -20,8 +20,16 @@ authors = [
 ]
 classifiers = [
     "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dynamic = ['version']
+
+[project.optional-dependencies]
+test = ["pytest", "niess>=0.1.4"]
 
 [project.scripts]
 mp-splitrun = 'mccode_plumber.splitrun:main'
@@ -44,3 +52,25 @@ mp-nexus-services = 'mccode_plumber.manage.orchestrate:services'
 
 [tool.setuptools_scm]
 
+[tool.tox]
+legacy_tox_ini = """
+    [tox]
+    min_version = 4.0
+    env_list =
+        py313
+        py312
+        py311
+        type
+
+    [testenv]
+    deps =
+        pytest
+        niess>=0.1.4
+    commands = pytest tests
+
+    [testenv:type]
+    deps =
+        mypy
+        types-PyYAML
+    commands = mypy src
+"""

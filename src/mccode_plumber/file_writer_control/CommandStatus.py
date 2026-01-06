@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from typing import Optional
@@ -18,7 +20,7 @@ class CommandState(Enum):
     SUCCESS = auto()
 
 
-class CommandStatus(object):
+class CommandStatus:
     """
     The status of a command.
     """
@@ -35,11 +37,11 @@ class CommandStatus(object):
         self._last_update = datetime.now()
         self._state = CommandState.NO_COMMAND
         self._message = ""
-        self._response_code = None
+        self._response_code: int | None = None
 
-    def __eq__(self, other_status: "CommandStatus"):
+    def __eq__(self, other_status):
         if not isinstance(other_status, CommandStatus):
-            raise NotImplementedError
+            return NotImplemented
         return (
             other_status.command_id == self.command_id
             and other_status.job_id == self.job_id

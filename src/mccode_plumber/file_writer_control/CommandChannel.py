@@ -74,8 +74,8 @@ class CommandChannel(object):
         :param command_topic_url: The url of the Kafka topic to where the file-writer status/command messages are published.
         """
         kafka_address = KafkaTopicUrl(command_topic_url)
-        self.status_queue = Queue()
-        self.to_thread_queue = Queue()
+        self.status_queue: Queue = Queue()
+        self.to_thread_queue: Queue = Queue()
         thread_kwargs = {
             "host_port": kafka_address.host_port,
             "topic": kafka_address.topic,

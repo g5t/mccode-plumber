@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -84,7 +86,8 @@ class WorkerFinderBase:
         :param job_id: The job identifier of the currently running file-writer job.
         :return: A CommandHandler instance for (more) easily checking the outcome of the "abort" command.
         """
-        return self.try_send_stop_time(service_id, job_id, 0)
+        from datetime import datetime, UTC
+        return self.try_send_stop_time(service_id, job_id, datetime.fromtimestamp(0, UTC))
 
     def list_known_workers(self) -> List[WorkerStatus]:
         """
@@ -115,7 +118,7 @@ class WorkerFinderBase:
             return JobState.UNAVAILABLE
         return current_job.state
 
-    def get_job_status(self, job_id: str) -> JobStatus:
+    def get_job_status(self, job_id: str) -> JobStatus | None:
         """
         Get the full (known) status of a specific job.
         :param job_id: The (unique) identifier of the job that we are trying to find the status of.
