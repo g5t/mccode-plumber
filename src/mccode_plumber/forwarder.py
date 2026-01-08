@@ -7,6 +7,7 @@ list of EPICS PVs to monitor.
 Alternatively, the same functionality can be accessed from Python using the configure_forwarder and reset_forwarder
 functions. Which take PV information and Forwarder/Kafka configuration as arguments.
 """
+from mccode_antlr.common import InstrumentParameter
 
 
 def normalise_pvs(pvs: list[dict], config=None, prefix=None, topic=None):
@@ -59,10 +60,19 @@ def reset_forwarder(pvs: list[dict], config=None, prefix=None, topic=None):
     return pvs
 
 
-def forwarder_partial_streams(prefix, topic, parameters):
-    names = [p.name for p in parameters]
-    if 'mcpl_filename' not in names:
-        names.append("mcpl_filename")
+def forwarder_partial_streams(prefix: str, topic: str, parameters: list[InstrumentParameter]):
+    from mccode_antlr.common import DataType
+    # The streaming-data-type f144 only supports numeric data, so we need to
+    # filter out string-valued data types to avoid annoying error messages in the
+    # forwarder's log output.
+    names = [p.name for p in parameters if p.value.data_type is not DataType.str]
+
+    # splitrun adds an instrument parameter named 'mcpl_filename', but we also
+    # can not forward this since it is a string-valued parameter.
+    #
+    #if 'mcpl_filename' not in names:
+    #    names.append("mcpl_filename")
+
     # Minimal information used by the forwarder for stream setup:
     partial = [dict(source=f'{prefix}{n}', module='f144', topic=topic) for n in names]
     return partial

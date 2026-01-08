@@ -61,10 +61,13 @@ class WriterUnitsTestCase(unittest.TestCase):
     def test_parse(self):
         from mccode_plumber.writer import construct_writer_pv_dicts_from_parameters
         params = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
-        self.assertEqual(len(params), 4)
-        for p, x in zip(params, [('a', 'Hz'), ('b', 'm'), ('c', None), ('d', None)]):
+        # Only non-string valued parameters should be extracted since f144 only
+        # supports numeric-valued data
+        self.assertEqual(len(params), 3)
+        for p, x in zip(params, [('a', 'Hz'), ('b', 'm'), ('c', None)]):
             self.assertEqual(p['name'], x[0])
             self.assertEqual(p['unit'], x[1])
+            self.assertEqual(p['module'], 'f144')
 
 
 if __name__ == '__main__':
