@@ -311,8 +311,16 @@ def construct_writer_pv_dicts(instr: Path | str, prefix: str, topic: str):
 
 
 def construct_writer_pv_dicts_from_parameters(parameters, prefix: str, topic: str):
+    from mccode_antlr.common import DataType
+
     def strip_quotes(s):
         return s[1:-1] if s is not None and len(s) > 2 and (s[0] == s[-1] == '"' or s[0] == s[-1] == "'") else s
+
+    # Remove string-valued parameters from the provided list since they are not
+    # supported by streaming-data-type f144. In the future we could specify a different
+    # module for them instead.
+    parameters = [p for p in parameters if p.value.data_type is not DataType.str]
+
     return [dict(name=p.name, dtype=p.value.data_type.name, source=f'{prefix}{p.name}', topic=topic,
                  description=parameter_description(p), module='f144', unit=strip_quotes(p.unit)) for p in parameters]
 
