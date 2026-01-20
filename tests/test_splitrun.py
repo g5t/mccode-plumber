@@ -70,6 +70,61 @@ class SplitrunTestCase(unittest.TestCase):
         args = args_fixup(parser.parse_args(['--broker', 'l:9092', '--source', 'm', '-n', '10000', 'inst.h5', '--', 'a=1:4', 'b=2:5', 'c=1,2,3,4,5']))
         self.assertEqual(args.parameters, ['a=1:4', 'b=2:5', 'c=1,2,3,4,5'])
 
+    # New tests for the --keep-after-send flag and how it controls the 'delete' kwarg
+    def test_keep_after_send_defaults_to_false_and_delete_true(self):
+        # make parser match main() which adds this argument
+        parser = make_parser()
+        parser.add_argument('--keep-after-send', action='store_true', help='Keep after sending histograms', default=False)
+        args = args_fixup(parser.parse_args(['--broker', 'l:9092', '--source', 'm', '-n', '10', 'inst.h5', '--', 'a=1:4']))
+        # flag not passed, should be False
+        self.assertFalse(args.keep_after_send)
+
+        from mccode_plumber.splitrun import monitors_to_kafka_callback_with_arguments
+        callback, callback_args = monitors_to_kafka_callback_with_arguments(
+            broker=args.broker, topic=args.topic, source=args.source, names=args.names,
+            delete_after_sending=not args.keep_after_send
+        )
+
+        # inspect closure to find the dict with 'delete'
+        delete_value = None
+        for cell in (callback.__closure__ or ()):  # pragma: no branch - defensive
+            try:
+                val = cell.cell_contents
+            except ValueError:
+                continue
+            if isinstance(val, dict) and 'delete' in val:
+                delete_value = val['delete']
+                break
+
+        self.assertIsNotNone(delete_value)
+        self.assertTrue(delete_value)
+
+    def test_keep_after_send_passed_sets_delete_false(self):
+        parser = make_parser()
+        parser.add_argument('--keep-after-send', action='store_true', help='Keep after sending histograms', default=False)
+        args = args_fixup(parser.parse_args(['--keep-after-send', '--broker', 'l:9092', '--source', 'm', '-n', '10', 'inst.h5', '--', 'a=1:4']))
+        # flag passed, should be True
+        self.assertTrue(args.keep_after_send)
+
+        from mccode_plumber.splitrun import monitors_to_kafka_callback_with_arguments
+        callback, callback_args = monitors_to_kafka_callback_with_arguments(
+            broker=args.broker, topic=args.topic, source=args.source, names=args.names,
+            delete_after_sending=not args.keep_after_send
+        )
+
+        delete_value = None
+        for cell in (callback.__closure__ or ()):  # pragma: no branch - defensive
+            try:
+                val = cell.cell_contents
+            except ValueError:
+                continue
+            if isinstance(val, dict) and 'delete' in val:
+                delete_value = val['delete']
+                break
+
+        self.assertIsNotNone(delete_value)
+        self.assertFalse(delete_value)
+
 
 if __name__ == '__main__':
     unittest.main()

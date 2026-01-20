@@ -17,11 +17,15 @@ def make_parser():
 
 
 def monitors_to_kafka_callback_with_arguments(
-        broker: str, topic: str | None, source: str | None, names: list[str] | None
+        broker: str, topic: str | None, source: str | None, names: list[str] | None,
+        delete_after_sending: bool = True,
 ):
     from mccode_to_kafka.sender import send_histograms
 
-    partial_kwargs: dict[str, Union[str,list[str]]] = {'broker': broker}
+    partial_kwargs: dict[str, Union[str,list[str]]] = {
+        'broker': broker,
+        'delete': delete_after_sending,
+    }
     if topic is not None and source is not None and names is not None and len(names) > 1:
         raise ValueError("Cannot specify both topic/source and multiple names simultaneously.")
 
@@ -41,7 +45,15 @@ def monitors_to_kafka_callback_with_arguments(
 def main():
     from .mccode import get_mcstas_instr
     from restage.splitrun import splitrun_args, parse_splitrun
-    args, parameters, precision = parse_splitrun(make_parser())
+    parser = make_parser()
+    parser.add_argument('--keep-after-send', action='store_true', help='Keep after sending histograms', default=False)
+    args, parameters, precision = parse_splitrun(parser)
     instr = get_mcstas_instr(args.instrument)
-    callback, callback_args = monitors_to_kafka_callback_with_arguments(args.broker, args.topic, args.source, args.names)
+    callback, callback_args = monitors_to_kafka_callback_with_arguments(
+        broker=args.broker,
+        topic=args.topic,
+        source=args.source,
+        names=args.names,
+        delete_after_sending=not args.keep_after_send
+    )
     return splitrun_args(instr, parameters, precision, args, callback=callback, callback_arguments=callback_args)

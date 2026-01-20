@@ -9,8 +9,8 @@ dependencies = [
     'kafka-python>=2.2.11',
     'ess-streaming-data-types>=0.14.0',
     'restage>=0.10.1',
-    'mccode-to-kafka>=0.3.1',
-    'moreniius>=0.6.3',
+    'mccode-to-kafka>=0.5.0',
+    'moreniius>=0.7.0',
     'icecream',
     'ephemeral-port-reserve',
 ]
