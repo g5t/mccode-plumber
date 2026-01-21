@@ -261,6 +261,7 @@ def load_in_wait_load_out(
         )
         from mccode_plumber.manage.forwarder import forwarder_verbosity
         from mccode_plumber.manage.writer import writer_verbosity
+        from mccode_plumber.manage.manager import Triage
 
         # Start up services if they should be managed locally
         if manage:
@@ -283,7 +284,10 @@ def load_in_wait_load_out(
                 efu = [EventFormationUnitConfig.from_dict(data)]
             things = tuple(
                 EventFormationUnit.start(
-                    style=Fore.BLUE, broker=broker, **x.to_dict()
+                    style=Fore.BLUE,
+                    broker=broker,
+                    triage=Triage(ignore=["graphite", ":2003 failed"]),
+                    **x.to_dict()
                 ) for x in efu) + (
                 Forwarder.start(
                     name='FWD',
@@ -309,6 +313,9 @@ def load_in_wait_load_out(
                     verbosity=writer_verbosity(verbosity_writer),
                 ),
             )
+            longest_name = max(len(thing.name) for thing in things)
+            for thing in things:
+                thing.name_padding = longest_name - len(thing.name)
         else:
             things = ()
 
