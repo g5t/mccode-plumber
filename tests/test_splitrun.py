@@ -92,8 +92,8 @@ class SplitrunTestCase(unittest.TestCase):
                 val = cell.cell_contents
             except ValueError:
                 continue
-            if isinstance(val, dict) and 'delete' in val:
-                delete_value = val['delete']
+            if isinstance(val, dict) and 'remove' in val:
+                delete_value = val['remove']
                 break
 
         self.assertIsNotNone(delete_value)
@@ -118,8 +118,8 @@ class SplitrunTestCase(unittest.TestCase):
                 val = cell.cell_contents
             except ValueError:
                 continue
-            if isinstance(val, dict) and 'delete' in val:
-                delete_value = val['delete']
+            if isinstance(val, dict) and 'remove' in val:
+                delete_value = val['remove']
                 break
 
         self.assertIsNotNone(delete_value)
