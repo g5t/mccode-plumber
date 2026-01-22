@@ -306,6 +306,7 @@ def load_in_wait_load_out(
                 KafkaToNexus.start(
                     name='K2N',
                     style=Fore.RED + Style.DIM,
+                    triage=Triage(ignore=["ignored by this consumer instance"]),
                     broker=broker,
                     work=work,
                     command=TOPICS['command'],

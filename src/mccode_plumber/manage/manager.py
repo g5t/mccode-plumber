@@ -33,7 +33,7 @@ class Triage:
         'info': Fore.GREEN,
         'hint': Fore.BLUE,
         'debug': Fore.WHITE + Style.BRIGHT,
-        'default': Fore.WHITE,
+        'default': Fore.RESET,
     })
 
     def _filtered_level(self, level: str) -> bool:
