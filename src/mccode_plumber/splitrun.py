@@ -24,7 +24,7 @@ def monitors_to_kafka_callback_with_arguments(
 
     partial_kwargs: dict[str, Union[str,list[str]]] = {
         'broker': broker,
-        'delete': delete_after_sending,
+        'remove': delete_after_sending,
     }
     if topic is not None and source is not None and names is not None and len(names) > 1:
         raise ValueError("Cannot specify both topic/source and multiple names simultaneously.")
