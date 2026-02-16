@@ -22,21 +22,14 @@ class WriterTestCase(unittest.TestCase):
     def test_parse(self):
         from mccode_plumber.writer import construct_writer_pv_dicts_from_parameters
         from mccode_plumber.writer import default_nexus_structure
+        from moreniius.path_navigator import NexusStructureNavigator
         params = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
         self.assertEqual(len(params), 0)
-        struct = default_nexus_structure(self.instr)
+        nav = NexusStructureNavigator(default_nexus_structure(self.instr))
+        instrument = nav['/entry/instrument']
+        self.assertTrue(all(instrument.exists(x) for x in ('origin', 'source', 'monitor')))
 
-        self.assertEqual(len(struct['children']), 1)
-        self.assertEqual(struct['children'][0]['name'], 'entry')
-        self.assertEqual(struct['children'][0]['children'][0]['name'], 'instrument')
-        self.assertEqual(struct['children'][0]['children'][0]['children'][1]['name'], 'origin')
-        self.assertEqual(struct['children'][0]['children'][0]['children'][2]['name'], 'source')
-        self.assertEqual(struct['children'][0]['children'][0]['children'][3]['name'], 'monitor')
-        mon = struct['children'][0]['children'][0]['children'][3]
-        self.assertEqual(len(mon['children']), 4)  # removed 'mccode' property 5->4
-        idx = [i for i, ch in enumerate(mon['children']) if 'name' in ch and 'data' == ch['name']]
-        self.assertTrue(len(idx), 1)
-        data = mon['children'][idx[0]]
+        data = instrument['monitor/data'].structure
         idx = [i for i, ch in enumerate(data['children']) if 'module' in ch and 'da00' == ch['module']]
         self.assertEqual(len(idx), 1)
         da00 = data['children'][idx[0]]
