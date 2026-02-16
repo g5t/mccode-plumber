@@ -10,7 +10,7 @@ dependencies = [
     'ess-streaming-data-types>=0.14.0',
     'restage>=0.10.2',
     'mccode-to-kafka>=0.5.0',
-    'moreniius>=0.8.2',
+    'moreniius>=0.8.3',
     'icecream',
     'ephemeral-port-reserve',
 ]
