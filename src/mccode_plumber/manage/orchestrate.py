@@ -355,7 +355,11 @@ def make_splitrun_nexus_parser():
     parser = make_splitrun_parser()
     parser.prog = 'mp-nexus-splitrun'
     parser.add_argument('-v' ,'--version', action='version', version=__version__)
-    # No need to specify the broker, or monitor source or topic names
+    # No need to specify the monitor source or topic names
+    parser.add_argument(
+        '-b', '--broker', type=str, default=None, metavar='address:port',
+        help='Kafka broker for monitor data, EPICS forwarding and filewriter control',
+    )
     parser.add_argument('--structure', type=str, default=None, help='NeXus Structure JSON path')
     parser.add_argument('--structure-out', type=str, default=None, help='Output configured structure JSON path')
     parser.add_argument('--nexus-file', type=str, default=None, help='Output NeXus file path')
@@ -376,7 +380,7 @@ def main():
     monitor_topic = f'{instr.name}_beam_monitor'
     monitor_names = [s[1] for s in streams if s[0] == monitor_topic]
 
-    broker = 'localhost:9092'
+    broker = args.broker or 'localhost:9092'
     topics = list({s[0] for s in streams}) # ensure all topics are known to Kafka
     register_topics(broker, topics)
 
@@ -391,9 +395,9 @@ def main():
     kwargs = {
         'nexus_file': args.nexus_file, 'structure_out': args.structure_out
     }
-    for k in list(kwargs.keys()) + ['structure']:
+    for k in list(kwargs.keys()) + ['broker', 'structure']:
         delattr(args, k)
-    return orchestrate(instr, structure, broker, splitrun_kwargs, **kwargs)
+    orchestrate(instr, structure, broker, splitrun_kwargs, **kwargs)
 
 
 def orchestrate(
