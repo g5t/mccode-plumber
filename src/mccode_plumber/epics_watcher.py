@@ -1,5 +1,6 @@
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
+from textual.containers import Grid
 from textual.widgets import Static
 from textual.reactive import reactive
 from textual import events
@@ -19,7 +20,7 @@ class PVWidget(Static):
         self.pvname = pvname
         self.sid = pvname.replace(':', '')
         self.set_class(True, "pv-widget")
-        self.value_widget = None  # Store reference directly
+        self.value_widget: None | Static = None  # Store reference directly
 
     def compose(self) -> ComposeResult:
         yield Static(f"[b]{self.pvname}[/b]", id=f"label-{self.sid}")
@@ -44,20 +45,22 @@ class PVMonitorApp(App):
 
     def __init__(self, prefix: str, names: list[str]):
         super().__init__()
-        self.pv_widgets = {}
+        self.pv_widgets: dict[str, PVWidget]= {}
         self.ctx = Context("pva")  # Or 'ca' if using Channel Access
         self.prefix = prefix
         self.names = names
-        self.grid = None
+        self.grid: None | Grid = None
 
     def compose(self) -> ComposeResult:
-        from textual.containers import Grid
         self.grid = Grid(id="pv-grid")
         yield self.grid
 
     def on_mount(self) -> None:
+        if self.grid is None:
+            return
         self.grid.styles.grid_columns = ["1fr", "1fr", "1fr"]  # 3 columns
-        self.grid.styles.grid_gap = (1, 1)
+        self.grid.styles.grid_gutter_vertical = 1
+        self.grid.styles.grid_gutter_horizontal = 1
         for name in self.names:
             pv = f'{self.prefix}{name}'
             widget = PVWidget(pv)

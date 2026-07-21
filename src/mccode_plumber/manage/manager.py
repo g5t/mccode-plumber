@@ -14,7 +14,7 @@ class IOType(Enum):
 
 @dataclass
 class Triage:
-    level: str = field(default=lambda: 'info')
+    level: str = field(default_factory=lambda: 'info')
     ignore: list[str] = field(default_factory=list)
     patterns: dict[str, list[str]] = field(default_factory=lambda: {
         'critical': [r'\bcritical\b', r'^cri'],

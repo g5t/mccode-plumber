@@ -22,7 +22,7 @@ def monitors_to_kafka_callback_with_arguments(
 ):
     from mccode_to_kafka.sender import send_histograms
 
-    partial_kwargs: dict[str, Union[str,list[str]]] = {
+    partial_kwargs: dict[str, Union[str,list[str], bool]] = {
         'broker': broker,
         'remove': delete_after_sending,
     }
