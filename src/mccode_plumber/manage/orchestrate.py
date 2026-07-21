@@ -17,12 +17,21 @@ TOPICS = {
 }
 PREFIX = 'mcstas:'
 
-def guess_instr_config(name: str) -> Path:
+
+def guess_instr_config(name: int | str | Path) -> Path:
+    if isinstance(name, int):
+        raise ValueError('EFU parameter parsing error passed integer value to guess function')
+    if isinstance(name, Path):
+        name = name.stem
     guess = f'/event-formation-unit/configs/{name}/configs/{name}.json'
     return ensure_readable_file(Path(guess))
 
 
-def guess_instr_calibration(name: str) -> Path:
+def guess_instr_calibration(name: int | str | Path) -> Path:
+    if isinstance(name, int):
+        raise ValueError('EFU parameter parsing error passed integer value to guess function')
+    if isinstance(name, Path):
+        name = name.stem
     guess = f'/event-formation-unit/configs/{name}/configs/{name}nullcalib.json'
     return ensure_readable_file(Path(guess))
 

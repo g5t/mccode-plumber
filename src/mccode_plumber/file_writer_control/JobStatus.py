@@ -145,6 +145,6 @@ class JobStatus:
         return self._metadata
 
     @metadata.setter
-    def metadata(self, metadata: Dict) -> None:
+    def metadata(self, metadata: Optional[Dict]) -> None:
         self._metadata = metadata
 
