@@ -28,19 +28,35 @@ def instr_par_to_nt_primitive(parameters):
 def instr_par_nt_to_strings(parameters):
     return [f'{n}:{t}:{d}'.replace(' ','') for n, t, d in instr_par_to_nt_primitive(parameters)]
 
+#: pvData scalar type codes, by the Python type that parses one from a string.
+#: Signed and unsigned integers of every width are `int`; both float widths are `float`.
+#: The wide unsigned codes matter here: a top-dead-centre timestamp is nanoseconds since
+#: the epoch, which needs 61 bits today, so it fits `L` (uint64) and nothing narrower.
+_TYPE_CODE_PARSERS = (('s', str), ('bBhHiIlL', int), ('fd', float))
+
+
+def nt_type_parser(code: str):
+    """The Python type that reads one element of a pvData type code from a string."""
+    element = code[1:] if code.startswith('a') else code
+    for codes, parser in _TYPE_CODE_PARSERS:
+        if element in codes:
+            return parser
+    raise ValueError(
+        f"Unknown pvData type code {code!r}; expected one of "
+        f"{''.join(codes for codes, _ in _TYPE_CODE_PARSERS)}, optionally prefixed 'a'")
+
+
 def strings_to_instr_par_nt(strings):
     out = []
     for string in strings:
-        name, t, dstr = string.split(':')
-        trans = None
-        if 'i' in t:
-            trans = int
-        elif 'd' in t:
-            trans = float
-        elif 's' in t:
-            trans = str
-        else:
-            ValueError(f"Unknown type in {string}")
+        # From the right: a real ESS PV name is itself colon-separated
+        # (`BIFRO-ChpSy1:Chop-PSC-101:00-TS-I`), so only the last two colons delimit the
+        # type and the default. Splitting from the left works for bare McStas parameter
+        # names and for nothing else.
+        name, t, dstr = string.rsplit(':', 2)
+        # `nt_type_parser` raises on an unknown code. This used to *construct* a
+        # ValueError and drop it, leaving `trans` as None to fail obscurely further on.
+        trans = nt_type_parser(t)
         if t.startswith('a'):
             d = [trans(x) for x in dstr.translate(str.maketrans(',',' ','[]')).split()]
         else:
@@ -133,6 +149,33 @@ def stop(proc):
     proc.close()
 
 
+def parse_like(current, text: str):
+    """Read ``text`` as whatever the PV currently holds.
+
+    A PV knows its own type, so the value it already has says how to read the string --
+    which is how a scalar has always been updated here. Arrays are read the same way,
+    element by element: a chopper's top-dead-centre PV holds a vector of nanosecond
+    timestamps, and the string ``[1,2,3]`` has to reach it as three integers rather than
+    as one unparseable scalar.
+    """
+    import numpy as np
+    if isinstance(current, str):
+        return text
+    if isinstance(current, (np.ndarray, list, tuple)):
+        dtype = getattr(np.asarray(current), 'dtype', None)
+        element = int if dtype is not None and dtype.kind in 'iub' else float
+        items = text.translate(str.maketrans(',', ' ', '[]')).split()
+        return np.asarray([element(x) for x in items],
+                          dtype=dtype if dtype is not None else None)
+    if isinstance(current, bool):
+        return bool(int(text))
+    if isinstance(current, int):
+        return int(text)
+    if isinstance(current, float):
+        return float(text)
+    raise ValueError(f'unknown type {type(current)}')
+
+
 def update():
     from argparse import ArgumentParser
     from p4p.client.thread import Context
@@ -154,16 +197,13 @@ def update():
     ctx = Context('pva')
     for address, value in zip(addresses, values):
         pv = ctx.get(address, throw=False)
-        if isinstance(pv, float):
-            ctx.put(address, float(value))
-        elif isinstance(pv, int):
-            ctx.put(address, int(value))
-        elif isinstance(pv, str):
-            ctx.put(address, str(value))
-        elif isinstance(pv, TimeoutError):
+        if isinstance(pv, TimeoutError):
             print(f'[Timeout] Failed to update {address} with {value} (Unknown to EPICS?)')
-        else:
-            raise ValueError(f'Address {address} has unknown type {type(pv)}')
+            continue
+        try:
+            ctx.put(address, parse_like(pv, value))
+        except ValueError as error:
+            raise ValueError(f'Address {address}: {error}') from None
 
     ctx.disconnect()
 

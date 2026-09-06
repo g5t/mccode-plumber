@@ -78,6 +78,27 @@ def forwarder_partial_streams(prefix: str, topic: str, parameters: list[Instrume
     return partial
 
 
+def chopper_partial_streams(choppers, topic: str, prefix: str = ''):
+    """Forwarder streams for a set of disc choppers.
+
+    A chopper's top-dead-centre channel is `tdct`, not `f144`: it carries a vector of
+    absolute nanosecond timestamps rather than a single value, and the forwarder needs
+    telling which schema to serialise the PV into. `streams()` already passes `module`
+    through untouched, so declaring it here is the whole of it.
+
+    Each chopper is a mapping with a `tdc` PV name; anything else it carries -- speed,
+    delay, park angle -- is an ordinary `f144` value and is declared as one.
+    """
+    partial = []
+    for chopper in choppers:
+        tdc = chopper.get('tdc')
+        if tdc:
+            partial.append(dict(source=f'{prefix}{tdc}', module='tdct', topic=topic))
+        for name in chopper.get('values', ()):
+            partial.append(dict(source=f'{prefix}{name}', module='f144', topic=topic))
+    return partial
+
+
 def parse_registrar_args():
     from argparse import ArgumentParser
     from .mccode import get_mccode_instr_parameters
