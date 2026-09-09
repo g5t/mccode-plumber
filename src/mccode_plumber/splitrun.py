@@ -42,6 +42,63 @@ def monitors_to_kafka_callback_with_arguments(
     return callback, {'dir': 'root'}
 
 
+def _parameter_defaults(instr) -> dict[str, float]:
+    """The numeric value of every instrument parameter that has one, by lower-cased name.
+
+    The base a scan point is laid over: a chopper held fixed is not a scanned parameter and
+    so appears nowhere in what the point hands over, but its disc is still turning.
+    Publishing zero for it would be read downstream as a parked chopper.
+    """
+    out = {}
+    for parameter in instr.parameters:
+        expression = parameter.value
+        if not getattr(expression, 'has_value', False):
+            continue
+        try:
+            out[parameter.name.lower()] = float(expression.value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str):
+    """A *pre*-point hook publishing what the choppers are about to be doing.
+
+    Before, not after. `mp-tdc` free-runs on the pulse grid and reads these PVs as it goes,
+    so they have to describe the point that is about to be traced rather than the one that
+    just finished -- the whole reason restage grew a pre-point hook.
+
+    Setting the run PV here rather than in `orchestrate` is deliberate: it keeps the
+    crossings quiet through the primary MCPL stage, which produces no detector events and
+    where these parameters still hold their defaults. The put is idempotent, so every point
+    may safely repeat it.
+    """
+    from p4p.client.thread import Context
+
+    names = [n for c in choppers for n in (c.speed, c.delay, c.park) if n]
+    defaults = _parameter_defaults(instr)
+    missing: set[str] = set()
+    context: list = []
+
+    def callback(pars):
+        if not context:
+            context.append(Context('pva'))
+        values = dict(defaults)
+        values.update({str(k).lower(): v for k, v in pars.items()})
+        for name in names:
+            value = values.get(name.lower())
+            if value is None:
+                if name not in missing:
+                    missing.add(name)
+                    print(f'warning: no instrument parameter named {name!r}; its '
+                          f'chopper log will hold whatever the PV was last set to')
+                continue
+            context[0].put(name, float(value))
+        context[0].put(run_pv, 1)
+
+    return callback, {'pars': 'pars'}
+
+
 def main():
     from .mccode import get_mcstas_instr
     from restage.splitrun import splitrun_args, parse_splitrun
