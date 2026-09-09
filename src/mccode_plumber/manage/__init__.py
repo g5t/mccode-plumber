@@ -2,6 +2,7 @@ from .manager import Manager
 from .efu import EventFormationUnit
 from .epics import EPICSMailbox
 from .forwarder import Forwarder
+from .tdc import TDCFaker
 from .writer import KafkaToNexus
 from .ensure import (
     ensure_accessible_directory, ensure_accessible_file, ensure_executable,
@@ -16,6 +17,7 @@ __all__ = (
     "EPICSMailbox",
     "Forwarder",
     "KafkaToNexus",
+    "TDCFaker",
     "ensure_accessible_directory",
     "ensure_accessible_file",
     "ensure_executable",
