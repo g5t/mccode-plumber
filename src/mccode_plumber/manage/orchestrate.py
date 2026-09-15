@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import NamedTuple
 from mccode_antlr.common import InstrumentParameter
 from mccode_plumber.conductor import Chopper
 from mccode_antlr.instr import Instr
@@ -136,26 +137,106 @@ def start_writer(start_time: datetime,
     return job_id, success
 
 
-def get_stream_pairs_list(data: list | tuple):
-    topics = set()
-    for entry in data:
-        if isinstance(entry, dict):
-            topics.update(get_stream_pairs_dict(entry))
-        elif isinstance(entry, (list, tuple)):
-            topics.update(get_stream_pairs_list(entry))
-    return topics
+class Stream(NamedTuple):
+    """One filewriter stream directive: which module, on which topic, from which source.
+
+    The module is the part that used to be thrown away. Without it a caller asking
+    "where do the monitors publish?" has to recognise the topic by name, which means
+    re-deriving whatever convention the structure's author used -- and silently
+    finding nothing when that convention changes. With it the question is answered by
+    what the directive *is*: `da00` histograms, `ev44` events, `f144`/`tdct` logs.
+    """
+    module: str
+    topic: str
+    source: str
 
 
-def get_stream_pairs_dict(data: dict):
-    topics = set()
-    if all(k in data for k in ('topic', 'source')):
-        topics.add((data['topic'], data['source']))
-    for k, v in data.items():
-        if isinstance(v, dict):
-            topics.update(get_stream_pairs_dict(v))
-        elif isinstance(v, (list, tuple)):
-            topics.update(get_stream_pairs_list(list(v)))
-    return topics
+#: Modules carrying histogrammed monitor data, which McStas produces directly.
+MONITOR_MODULES = ('da00',)
+#: Modules carrying detector event data, which an EFU produces from readout packets.
+EVENT_MODULES = ('ev44',)
+
+
+def _walk_nodes(data):
+    """Every dict in a loaded JSON object, depth first."""
+    if isinstance(data, dict):
+        yield data
+        for value in data.values():
+            yield from _walk_nodes(value)
+    elif isinstance(data, (list, tuple)):
+        for entry in data:
+            yield from _walk_nodes(entry)
+
+
+def get_stream_modules(data) -> list[Stream]:
+    """Every stream directive in a NeXus structure, in the order it appears.
+
+    A directive is a node with a string `module` whose `config` names both a topic and
+    a source. Requiring the pair to sit inside a module's config -- rather than taking
+    any dict that happens to carry both keys -- is what keeps a `dataset` whose values
+    include 'topic' and 'source' from being mistaken for a stream. `link` modules are
+    skipped by the same rule: they carry a source but no topic, because they mirror a
+    group that some other module fills rather than subscribing to anything.
+
+    Deduplicated, because one topic/source/module triple declared twice is still one
+    stream, but order-preserving so that callers reporting a problem name the streams
+    in the order a reader would find them.
+    """
+    seen, streams = set(), []
+    for node in _walk_nodes(data):
+        module = node.get('module')
+        config = node.get('config')
+        if not isinstance(module, str) or not isinstance(config, dict):
+            continue
+        topic, source = config.get('topic'), config.get('source')
+        if not isinstance(topic, str) or not isinstance(source, str):
+            continue
+        entry = Stream(module, topic, source)
+        if entry not in seen:
+            seen.add(entry)
+            streams.append(entry)
+    return streams
+
+
+def streams_of_module(streams: list[Stream], modules) -> list[Stream]:
+    """Just the streams written by one of `modules`."""
+    return [s for s in streams if s.module in modules]
+
+
+def topics_of(streams: list[Stream]) -> list[str]:
+    """The distinct topics `streams` publish on, in order of first appearance."""
+    return list(dict.fromkeys(s.topic for s in streams))
+
+
+def event_topic_from_streams(streams: list[Stream]) -> str | None:
+    """The topic an EFU must publish on for the filewriter to find its events.
+
+    `None` when the structure declares no event stream, which leaves the caller's own
+    default in place -- a structure without detectors is not an error, it is an
+    instrument whose monitors are the only thing being written.
+
+    Several distinct event topics is an error rather than a choice: one EFU publishes
+    to one topic, so picking any one of them would leave the others silently empty.
+    An instrument that really does feed several topics needs one `--efu` per topic,
+    each naming its own, which `resolve_topic` then leaves untouched.
+    """
+    topics = topics_of(streams_of_module(streams, EVENT_MODULES))
+    if len(topics) > 1:
+        raise ValueError(
+            'The NeXus structure declares event streams on several topics '
+            f'({", ".join(topics)}); name one per EFU with --efu ...,topic:<name>.'
+        )
+    return topics[0] if topics else None
+
+
+def sources_by_topic(streams: list[Stream]) -> dict[str, list[str]]:
+    """The sources each topic carries, in order of first appearance."""
+    grouped: dict[str, list[str]] = {}
+    for s in streams:
+        names = grouped.setdefault(s.topic, [])
+        if s.source not in names:
+            names.append(s.source)
+    return grouped
 
 
 def _nx_class(node) -> str | None:
@@ -270,8 +351,13 @@ def chopper_forwarder_streams(specs, pulse) -> list[dict]:
 
 
 def get_stream_pairs(data: dict) -> list[tuple[str, str]]:
-    """Traverse a loaded JSON object and return the found list of (topic, source) pairs."""
-    return list(get_stream_pairs_dict(data))
+    """Traverse a loaded JSON object and return the found list of (topic, source) pairs.
+
+    Kept for callers that only need to know which topics exist. Anything choosing
+    *behaviour* from a stream wants `get_stream_modules` instead, so that it selects on
+    the module rather than on the shape of a topic name.
+    """
+    return [(s.topic, s.source) for s in get_stream_modules(data)]
 
 
 def load_file_json(file: str | Path):
@@ -320,8 +406,11 @@ def efu_parameter(s: str):
     # number of pixels or rings, etc.
     parts = s.split(',')
     binary: Path = ensure_executable(parts[0])
+    # No topic: the abbreviated form does not name one, and guessing here would send
+    # events to a topic the NeXus structure never mentions. `services` fills it in
+    # from the structure's detector stream, or falls back to TOPICS['event'].
     data : dict[str, int | str | Path] = {
-        'topic': TOPICS['event'], 'port': 9000, 'binary': binary, 'name': binary.stem
+        'port': 9000, 'binary': binary, 'name': binary.stem
     }
 
     if len(parts) > 1 and (len(parts) > 2 or not parts[1].isnumeric()):
@@ -362,6 +451,7 @@ def services():
     # the choppers and cannot disagree about the PV names.
     structure_path = Path(args.structure or Path(args.instrument).with_suffix('.json'))
     structure = load_file_json(structure_path) if structure_path.exists() else {}
+    streams = get_stream_modules(structure)
     kwargs = {
         'instr_name': instr_name,
         'instr_parameters': instr_parameters,
@@ -372,6 +462,8 @@ def services():
         'work': args.writer_working_dir,
         'verbosity_writer': args.writer_verbosity,
         'verbosity_forwarder': args.forwarder_verbosity,
+        'event_topic': event_topic_from_streams(streams),
+        'stream_topics': topics_of(streams),
     }
     load_in_wait_load_out(**kwargs)
 
@@ -387,6 +479,8 @@ def load_in_wait_load_out(
         manage: bool = True,
         verbosity_writer: str | None = None,
         verbosity_forwarder: str | None = None,
+        event_topic: str | None = None,
+        stream_topics: list[str] | None = None,
     ):
         import signal
         from time import sleep
@@ -406,7 +500,10 @@ def load_in_wait_load_out(
                     'binary': guess_instr_efu(instr_name),
                     'config': guess_instr_config(name=instr_name),
                     'calibration': guess_instr_calibration(name=instr_name),
-                    'topic': TOPICS['event'],
+                    # Where the structure says the detectors publish, so the filewriter
+                    # is subscribed to what this EFU produces. TOPICS['event'] only
+                    # survives for a structure that declares no detector at all.
+                    'topic': event_topic or TOPICS['event'],
                     'port': 9000
                 }
                 if any('port' in p.name for p in instr_parameters):
@@ -417,6 +514,9 @@ def load_in_wait_load_out(
                         # the instrument parameter has a default, which is an integer
                         data['port'] = port_parameter.value.value
                 efu = [EventFormationUnitConfig.from_dict(data)]
+            # Anything given with --efu but no topic: takes the structure's, falling
+            # back to TOPICS['event'] so a topic-less structure behaves as before.
+            efu = [x.resolve_topic(event_topic or TOPICS['event']) for x in efu]
             things = tuple(
                 EventFormationUnit.start(
                     style=Fore.BLUE,
@@ -467,8 +567,14 @@ def load_in_wait_load_out(
         else:
             things = ()
 
-        # Ensure stream topics exist
-        register_topics(broker, list(TOPICS.values()))
+        # Ensure stream topics exist. The control topics this process owns, plus every
+        # topic the structure names: the structure is where the topic list actually
+        # lives now, and registering only TOPICS would leave the detector and monitor
+        # topics to be auto-created on first publish, without the per-topic config
+        # `register_kafka_topics` applies.
+        register_topics(broker, list(dict.fromkeys(
+            list(TOPICS.values()) + list(stream_topics or ())
+        )))
 
         def signal_handler(signum, frame):
             if signum == signal.SIGINT:
@@ -518,25 +624,37 @@ def main():
     from restage.splitrun import parse_splitrun
     from mccode_plumber.splitrun import (
         chopper_parameters_callback_with_arguments,
-        monitors_to_kafka_callback_with_arguments,
+        monitors_to_kafka_callback_for_topics,
     )
     args, parameters, precision = parse_splitrun(make_splitrun_nexus_parser())
     instr = get_mcstas_instr(args.instrument)
 
     structure = load_file_json(args.structure if args.structure else Path(args.instrument).with_suffix('.json'))
 
-    streams = get_stream_pairs(structure)
-    # All monitors should use a single topic:
-    monitor_topic = f'{instr.name}_beam_monitor'
-    monitor_names = [s[1] for s in streams if s[0] == monitor_topic]
+    streams = get_stream_modules(structure)
+    # Where each monitor publishes comes from the structure's own da00 directives, not
+    # from rebuilding a topic name out of the instrument name. Reconstructing it meant
+    # holding the same naming convention in two repositories, and disagreeing with it
+    # produced no error -- just an empty name list, and monitor data nobody received.
+    # Reading the directives also means several monitor topics work as written.
+    monitor_sources = sources_by_topic(streams_of_module(streams, MONITOR_MODULES))
+    topics = topics_of(streams)  # ensure all topics are known to Kafka
+
+    if not monitor_sources:
+        # No da00 directive to read: keep sending every histogram to the topic this
+        # has always derived, rather than sending nothing at all. A structure that
+        # predates monitor streams still gets its monitors published.
+        monitor_topic = f'{instr.name}_beam_monitor'
+        monitor_sources = {monitor_topic: []}
+        if monitor_topic not in topics:
+            topics.append(monitor_topic)
 
     broker = args.broker or 'localhost:9092'
-    topics = list({s[0] for s in streams}) # ensure all topics are known to Kafka
     register_topics(broker, topics)
 
-    # Configure the callback to send monitor data to Kafka, using the common topic with source names as monitor names
-    callback, callback_args = monitors_to_kafka_callback_with_arguments(
-        broker=broker, topic=monitor_topic, source=None, names=monitor_names
+    # One send per topic, each carrying the monitors the structure put on it.
+    callback, callback_args = monitors_to_kafka_callback_for_topics(
+        broker=broker, sources=monitor_sources
     )
     splitrun_kwargs = {
         'args': args, 'parameters': parameters, 'precision': precision,

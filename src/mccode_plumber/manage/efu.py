@@ -11,15 +11,15 @@ class EventFormationUnitConfig:
     binary: Path
     config: Path
     calibration: Path
-    topic: str
-    samples_topic: str
+    topic: str | None
+    samples_topic: str | None
     port: int
     monitor_every: int
     monitor_consecutive: int
 
     @classmethod
     def from_dict(cls, data: dict):
-        required = ('binary', 'config', 'calibration', 'topic', 'port')
+        required = ('binary', 'config', 'calibration', 'port')
         if any(req not in data for req in required):
             missing = [req for req in required if req not in data]
             msg = ', '.join(missing)
@@ -28,15 +28,41 @@ class EventFormationUnitConfig:
         binary = ensure_readable_file(data['binary'])
         config = ensure_readable_file(data['config'])
         calibration = ensure_readable_file(data['calibration'])
-        topic = data['topic']
+        # An absent topic is 'not chosen yet', not 'SimulatedEvents'. The EFU has to
+        # publish where the filewriter is subscribed, and only the NeXus structure
+        # knows where that is, so the choice is deferred to `resolve_topic` rather
+        # than defaulted here to a name the structure has never heard of.
+        topic = data.get('topic')
         port = int(data['port'])
         monitor_every = int(data.get('monitor_every', 1000))
         monitor_consecutive = int(data.get('monitor_consecutive', 2))
         name = data.get('name', binary.stem)
-        samples_topic = data.get('samples_topic', f'{topic}_samples')
+        samples_topic = data.get('samples_topic')
+        if samples_topic is None and topic is not None:
+            samples_topic = f'{topic}_samples'
         return cls(name, binary, config, calibration, topic, samples_topic, port, monitor_every, monitor_consecutive)
 
+    def resolve_topic(self, topic: str | None):
+        """This config with an unchosen topic filled in from `topic`.
+
+        Only fills what was left open: a topic given explicitly on the command line is
+        a deliberate choice about where this EFU publishes and outranks anything
+        derived from the structure. `samples_topic` follows the topic it was derived
+        from, so resolving one without the other cannot leave them describing two
+        different detectors.
+        """
+        from dataclasses import replace
+        if self.topic is not None or topic is None:
+            return self
+        samples = self.samples_topic if self.samples_topic is not None else f'{topic}_samples'
+        return replace(self, topic=topic, samples_topic=samples)
+
     def to_dict(self):
+        if self.topic is None:
+            raise ValueError(
+                f"EFU '{self.name}' has no topic. Give one as 'topic:<name>' or name the "
+                "detector stream in the NeXus structure so it can be derived from there."
+            )
         d = {
             'name': self.name,
             'binary': self.binary.as_posix(),
