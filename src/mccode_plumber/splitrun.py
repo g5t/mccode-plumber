@@ -42,6 +42,56 @@ def monitors_to_kafka_callback_with_arguments(
     return callback, {'dir': 'root'}
 
 
+def monitors_to_kafka_callback_for_topics(
+        broker: str, sources: dict[str, list[str]],
+        delete_after_sending: bool = True,
+):
+    """Send each monitor's histogram to the topic a NeXus structure puts it on.
+
+    `sources` maps topic to the monitor names published there, as
+    `orchestrate.sources_by_topic` groups them. A topic mapped to an empty list takes
+    every histogram found, which is what a structure declaring no monitor stream falls
+    back to.
+
+    `send_histograms` takes a single topic per call, so several topics means several
+    calls rather than one call carrying a topic per name. Removal is held back until
+    every call has run and then done here by name: `send_histograms(remove=True)`
+    deletes the files that call sent, so a monitor published on two topics would have
+    its file deleted by the first call and be missing from the second.
+    """
+    from pathlib import Path as _Path
+    from mccode_to_kafka.sender import send_histograms
+
+    def callback(*args, **kwargs):
+        root = kwargs.get('root', args[0] if args else None)
+        root = _Path(root)
+        # Resolve 'everything found' to actual names before sending, so that what gets
+        # removed afterwards is exactly what got sent. Mirrors send_histograms' own
+        # discovery, including a root that names a single .dat file.
+        if root.is_file():
+            found, root = [root.stem], root.parent
+        else:
+            found = [_Path(x).stem for x in root.glob('*.dat')]
+        groups = {t: (list(names) if names else found) for t, names in sources.items()}
+
+        for topic, names in groups.items():
+            send_histograms(root, names=names, topic=topic, broker=broker, remove=False)
+
+        if delete_after_sending:
+            _remove_histograms(root, {n for names in groups.values() for n in names})
+
+    return callback, {'dir': 'root'}
+
+
+def _remove_histograms(root, names):
+    """Delete the named histogram files, once every topic has had its chance to read them."""
+    from mccode_to_kafka.sender import HistogramInfo
+    for name in names:
+        histogram = HistogramInfo(root, name)
+        if histogram.exists:
+            histogram.delete()
+
+
 def _parameter_defaults(instr) -> dict[str, float]:
     """The numeric value of every instrument parameter that has one, by lower-cased name.
 
