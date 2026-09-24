@@ -53,6 +53,78 @@ def _get_or_add_stream(children: list, name: str, stream_config: dict):
 #     return dict(name=ch['name'], type='group', attributes=[attrs], children=[log_child, desc_child])
 
 
+#: Module directives that do not subscribe to anything. `link` mirrors a group filled
+#: elsewhere and `dataset` carries a literal value, so neither is evidence that a
+#: parameter is already being logged.
+NON_STREAM_MODULES = frozenset({'link', 'dataset'})
+
+#: NXlog names that say what the log *contains* rather than which parameter it is.
+#: An NXpositioner keeps its log in a child named `value`, so reading that as a
+#: parameter name would skip a parameter that happens to be called `value`. The
+#: positioner is still recognised, through the source its stream draws on.
+GENERIC_LOG_NAMES = frozenset({'value', 'time'})
+
+
+def _nx_class(node: dict) -> str | None:
+    """The NX_class a group declares, if it declares one."""
+    for attribute in node.get('attributes') or ():
+        if isinstance(attribute, dict) and attribute.get('name') == 'NX_class':
+            return attribute.get('values')
+    return None
+
+
+def _walk(node):
+    """Every dict in a loaded structure, depth first."""
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk(value)
+    elif isinstance(node, (list, tuple)):
+        for entry in node:
+            yield from _walk(entry)
+
+
+def logged_names(ns: dict) -> set[str]:
+    """Every name the structure's existing NXlogs already log something under.
+
+    An NXlog counts only if something actually fills it -- a stream module drawing on
+    a topic. An NXlog built purely from `link` modules is a mirror of a log kept
+    somewhere else, and on these structures the place it mirrors is
+    `/entry/parameters/<name>`: the very log this module is about to add. Reading it
+    as coverage would be backwards, and would delete the entry those links resolve
+    against, leaving them pointing at nothing.
+
+    A qualifying log contributes the source of every stream in it, and its own group
+    name unless that name only describes the log's contents -- see
+    `GENERIC_LOG_NAMES`. Both are needed because the two shapes a parameter's log
+    arrives in identify it differently: a bare NXlog is named for the parameter and
+    draws on a source named for it too, while a positioner's log is named `value`
+    inside a group named for the parameter, and only the source still carries the name.
+
+    The group name matters on its own for a parameter wired to a real positioner,
+    whose stream draws on a facility PV bearing no resemblance to the McStas name.
+    """
+    names = set()
+    for node in _walk(ns):
+        if node.get('type') != 'group' or _nx_class(node) != 'NXlog':
+            continue
+        sources = set()
+        for child in _walk(node):
+            module = child.get('module')
+            if not isinstance(module, str) or module in NON_STREAM_MODULES:
+                continue
+            source = (child.get('config') or {}).get('source')
+            if isinstance(source, str):
+                sources.add(source)
+        if not sources:
+            continue
+        names |= sources
+        name = node.get('name')
+        if isinstance(name, str) and name not in GENERIC_LOG_NAMES:
+            names.add(name)
+    return names
+
+
 def a_log_as_of_20230626(ch: dict):
     """Correct form as of June 26, 2023. Notably, source, topic, type, and unit go in a config field.
 
@@ -100,10 +172,24 @@ def add_pvs_to_nexus_structure(ns: dict, pvs: list[dict]):
     # So dump everything directly into 'children'
     # but 'NXparameters' _does_ exist:
     parameters, entry['children'] = _get_or_add_group(entry['children'], 'parameters', 'NXparameters')
+    # Whatever the structure already logs, it logs: a second NXlog for the same
+    # parameter is two groups filled from two topics claiming to describe one
+    # quantity, and the one added here would be the simulation knob shadowing a
+    # real positioner. Collected before the loop, so the entries added below --
+    # which are NXlogs too -- cannot mask each other.
+    already = logged_names(ns)
+    skipped = []
     for pv in pvs:
         if any(x not in pv for x in ['name', 'dtype', 'source', 'topic', 'description', 'module', 'unit']):
             raise RuntimeError(f"PV {pv['name']} is missing one or more required keys")
+        if pv['name'] in already or pv['source'] in already:
+            skipped.append(pv['name'])
+            continue
         parameters['children'].append(a_log_as_of_20230626(pv))
+    if skipped:
+        from zenlog import log
+        log.info(f'Parameters already logged by the NeXus structure, not added to '
+                 f'/entry/parameters: {", ".join(skipped)}')
     return ns
 
 
