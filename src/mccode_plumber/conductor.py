@@ -9,8 +9,10 @@ What this adds beyond passing values through is the chopper half. An ESS `NXdisk
 wants a stream of top-dead-centre times, and a simulation does not record them: it
 records the two numbers they follow from, the disc's speed and its delay. So the times
 are computed here, from those parameters and the pulse the replayer just started, and
-written to the chopper's TDC channel as a vector of absolute nanoseconds. The external
-forwarder turns that PV into `tdct` on Kafka; nothing here serialises a flatbuffer.
+written to the chopper's TDC channel as a vector of nanosecond offsets from the pulse,
+stamped with the pulse instant. The external forwarder adds that stamp to every element
+as it turns the PV into `tdct` on Kafka -- ESS chopper timestamps are relative to the
+EPICS update -- and nothing here serialises a flatbuffer.
 
 The pulse is the whole point. A top-dead-centre time means nothing on its own -- it is
 measured *from* a pulse -- so the same instant that stamps the TDC vector is also
@@ -73,6 +75,20 @@ class Chopper:
                   by_parameter: bool = False) -> list[int]:
         """When the disc's mark passes, over one pulse, as absolute nanoseconds.
 
+        `offsets` from ``pulse_ns``. What goes on a TDC PV is the offsets, not these:
+        see `offsets`.
+        """
+        return [pulse_ns + offset for offset in self.offsets(values, by_parameter)]
+
+    def offsets(self, values: dict[str, float], by_parameter: bool = False) -> list[int]:
+        """When the disc's mark passes, in nanoseconds after the pulse.
+
+        This is what a TDC PV carries. The forwarder serialises a `tdct` stream as
+        each element *plus the PV's own timestamp* -- ESS chopper timestamps are
+        relative to the EPICS update -- so a PV stamped with the pulse instant and
+        holding these offsets forwards the absolute crossing times. Absolute times on
+        the PV would have the epoch added twice.
+
         The disc turns at ``speed`` and its mark reaches the beam ``delay`` after the
         pulse, so the crossings are ``delay + k/|speed|`` -- the same arithmetic the
         emitted McStas already does to offset each opening from the disc's own delay.
@@ -100,7 +116,16 @@ class Chopper:
         if period_ns <= 0:
             return []
         turns = max(1, int(round(NS / 14.0 / period_ns)))
-        return [pulse_ns + delay_ns + k * period_ns for k in range(turns)]
+        return [delay_ns + k * period_ns for k in range(turns)]
+
+
+def pulse_stamp(pulse_ns: int) -> tuple[int, int]:
+    """A nanosecond instant as the ``(seconds, nanoseconds)`` pair an EPICS stamp holds.
+
+    Exact, where a float of seconds is not: at today's epoch a double resolves only
+    about 240 ns, and the forwarder adds back whatever the stamp says.
+    """
+    return divmod(int(pulse_ns), NS)
 
 
 @dataclass
@@ -146,13 +171,18 @@ class ChopperPublisher:
         """All of this point's parameters have been published."""
 
     def pulse_ready(self, point: int, pulse_ns: int) -> None:
-        """The replayer has started a pulse at ``pulse_ns``; everything hangs off it."""
-        self._put(self.pulse_pv, self.pulse_value)
+        """The replayer has started a pulse at ``pulse_ns``; everything hangs off it.
+
+        The reference sample and each disc's offsets are put stamped with exactly that
+        instant: the forwarder adds a TDC PV's stamp to every element it carries.
+        """
+        stamp = pulse_stamp(pulse_ns)
+        self._put_stamped(self.pulse_pv, self.pulse_value, stamp)
         numbers = self._numeric_values()
         for chopper in self.choppers:
-            times = chopper.crossings(pulse_ns, numbers, by_parameter=True)
-            if times:
-                self._put_timestamps(chopper.tdc, times)
+            offsets = chopper.offsets(numbers, by_parameter=True)
+            if offsets:
+                self._put_timestamps(chopper.tdc, offsets, stamp)
 
     # -- putting values ------------------------------------------------------------
 
@@ -175,9 +205,17 @@ class ChopperPublisher:
             value = parse_like(current, value)
         self.context.put(address, value)
 
-    def _put_timestamps(self, address: str, times: list[int]) -> None:
+    def _put_stamped(self, address: str, value, stamp: tuple[int, int]) -> None:
+        """Put ``value`` carrying its own timestamp, which the mailbox keeps."""
+        self.context.put(address, {
+            'value': value,
+            'timeStamp': {'secondsPastEpoch': stamp[0], 'nanoseconds': stamp[1]},
+        })
+
+    def _put_timestamps(self, address: str, offsets: list[int],
+                        stamp: tuple[int, int]) -> None:
         import numpy as np
-        self.context.put(address, np.asarray(times, dtype=np.uint64))
+        self._put_stamped(address, np.asarray(offsets, dtype=np.uint64), stamp)
         self._sequence[address] = self._sequence.get(address, 0) + 1
 
 

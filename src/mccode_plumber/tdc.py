@@ -1,7 +1,8 @@
 """Publish chopper top-dead-centre times while a simulation is running.
 
 An ESS `NXdisk_chopper` wants a `tdct` stream: a vector of absolute nanoseconds saying
-when the disc's mark passed its pickup. A simulation never measures that. It records the
+when the disc's mark passed its pickup. The PV behind it holds those times as offsets
+from its own EPICS timestamp, and the forwarder adds the stamp back. A simulation never measures that. It records the
 two numbers the crossings follow from -- the disc's speed and its delay -- and the times
 are `delay + k/|speed|` after a pulse.
 
@@ -10,7 +11,7 @@ pulse instant comes from `readout-replay`, which knows exactly when it sent the 
 crossing has to be comparable with. The all-at-once flow has no replayer. `ReadoutCAEN`
 emits its packets during the raytrace, at wall-clock time, so anything that must share
 those timestamps has to be produced live -- which is all this server adds. The arithmetic
-is `conductor.Chopper.crossings`, unchanged; only the clock is new, and only the clock
+is `conductor.Chopper.offsets`, unchanged; only the clock is new, and only the clock
 goes away when the replayer arrives.
 
 It serves its own PVs rather than putting into the mailbox, for two reasons. The cadence
@@ -142,17 +143,23 @@ class FakeTDC:
     def emit(self, pulse_ns: int) -> None:
         """One pulse: the reference sample, then whatever crossed since it.
 
-        Both are stamped with the pulse instant. Stamping with a fresh `time.time_ns()`
-        would put the reference sample after the crossings measured from it.
+        Both are stamped with the pulse instant, exactly, as ``(seconds, nanoseconds)``.
+        Stamping with a fresh `time.time_ns()` would put the reference sample after the
+        crossings measured from it.
+
+        A TDC PV holds each crossing's *offset* from its stamp, in nanoseconds. The
+        forwarder's `tdct` serialiser adds the stamp to every element, which is how an
+        ESS chopper's timestamps are published: relative to the EPICS update.
         """
         import numpy as np
-        timestamp = pulse_ns / NS
-        self.pvs[self.pulse_pv].post(PULSE_VALUE, timestamp=timestamp)
+        from .conductor import pulse_stamp
+        stamp = pulse_stamp(pulse_ns)
+        self.pvs[self.pulse_pv].post(PULSE_VALUE, timestamp=stamp)
         for chopper in self.choppers:
-            times = chopper.crossings(pulse_ns, self.values)
-            if times:
+            offsets = chopper.offsets(self.values)
+            if offsets:
                 self.pvs[chopper.tdc].post(
-                    np.asarray(times, dtype=np.uint64), timestamp=timestamp)
+                    np.asarray(offsets, dtype=np.uint64), timestamp=stamp)
 
     def run(self, ticks: int | None = None, clock=None, wait=None) -> None:
         """Tick the pulse grid, publishing on the ticks a run is in progress for.
