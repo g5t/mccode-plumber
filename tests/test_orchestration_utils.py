@@ -48,8 +48,9 @@ def test_monitor_streams():
     assembler = Assembler("bifrost", flavor=Flavor.MCSTAS, registries=get_registries())
 
     primary = Primary.from_calibration()
-    primary.source.n_pulses = 1
-    primary.source.accelerator_power = scalar(2.0, unit='MW')
+    # niess >= 0.8 calls the moderator `moderator`; `source` is the accelerator's NXsource
+    primary.moderator.n_pulses = 1
+    primary.moderator.accelerator_power = scalar(2.0, unit='MW')
 
     primary.to_mccode(assembler)
 
