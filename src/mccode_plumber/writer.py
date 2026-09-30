@@ -103,6 +103,11 @@ def logged_names(ns: dict) -> set[str]:
 
     The group name matters on its own for a parameter wired to a real positioner,
     whose stream draws on a facility PV bearing no resemblance to the McStas name.
+
+    Best of all is a log that says which parameter fills it: niess writes a
+    `simulation_parameter` attribute on every log it simulates, so a log bound to a
+    facility's names (`sample_rotation/value`, drawing on
+    `mcstas:BIFRO-SpRot:MC-RotZ-01:Mtr.RBV`) is still recognised as `sample_rotation`.
     """
     names = set()
     for node in _walk(ns):
@@ -119,6 +124,11 @@ def logged_names(ns: dict) -> set[str]:
         if not sources:
             continue
         names |= sources
+        for attribute in node.get('attributes') or ():
+            if (isinstance(attribute, dict)
+                    and attribute.get('name') == 'simulation_parameter'
+                    and isinstance(attribute.get('values'), str)):
+                names.add(attribute['values'])
         name = node.get('name')
         if isinstance(name, str) and name not in GENERIC_LOG_NAMES:
             names.add(name)

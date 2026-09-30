@@ -114,19 +114,34 @@ def parse_args():
     return parameters, args
 
 
-def main(names: dict[str, NTScalar], prefix: str | None = None, filename_required: bool = True):
+def main(names: dict[str, NTScalar], prefix: str | None = None, filename_required: bool = True,
+         exact: dict[str, NTScalar] | None = None):
+    """Serve ``names`` under ``prefix``, and ``exact`` under exactly the names given.
+
+    ``exact`` is for PVs a NeXus structure names outright: a simulated log bound to a
+    facility's names draws on ``mcstas:BIFRO-SpRot:MC-RotZ-01:Mtr.RBV``, which is not
+    the prefix plus any parameter's name.
+    """
     provider = StaticProvider('mailbox')  # 'mailbox' is an arbitrary name
 
     if filename_required and 'mcpl_filename' not in names:
         names['mcpl_filename'] = NTScalar('s').wrap('')
 
+    addresses = {(f'{prefix}{name}' if prefix else name): value
+                 for name, value in names.items()}
+    for name, value in (exact or {}).items():
+        if name in addresses:
+            raise ValueError(f'{name} is already served as an instrument parameter')
+        addresses[name] = value
+
     pvs = []  # we must keep a reference in order to keep the Handler from being collected
-    for name, value in names.items():
+    for address, value in addresses.items():
         pv = SharedPV(initial=value, handler=MailboxHandler())
-        provider.add(f'{prefix}{name}' if prefix else name, pv)
+        provider.add(address, pv)
         pvs.append(pv)
 
-    print(f'Start mailbox server for {len(pvs)} PVs with prefix {prefix}')
+    print(f'Start mailbox server for {len(pvs)} PVs with prefix {prefix}'
+          + (f', {len(exact)} of them named exactly' if exact else ''))
     Server.forever(providers=[provider])
     print('Done')
 
@@ -214,13 +229,16 @@ def get_strings_parser():
     p = ArgumentParser()
     p.add_argument('strings', type=str, nargs='+', help='The string encoded NTScalars to read, each name:type-char:default')
     p.add_argument('-p', '--prefix', type=str, help='The EPICS PV prefix to use', default='mcstas:')
+    p.add_argument('--exact', type=str, action='append', default=[], metavar='name:type-char:default',
+                   help='A PV served under exactly this name, without the prefix; repeatable')
     p.add_argument('-v', '--version', action='version', version=__version__)
     return p
 
 
 def run_strings():
     args = get_strings_parser().parse_args()
-    main(convert_strings_to_nt(args.strings), prefix=args.prefix)
+    main(convert_strings_to_nt(args.strings), prefix=args.prefix,
+         exact=convert_strings_to_nt(args.exact))
 
 
 

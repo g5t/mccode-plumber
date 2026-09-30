@@ -218,17 +218,22 @@ def main(choppers, pulse_pv: str = 'pulse', run_pv: str = 'tdc_run',
 
 
 def parse_chopper(text: str) -> Chopper:
-    """`name,tdc,speed,delay[,park]` -- the five names a crossing needs.
+    """`name,tdc,speed,delay[,park][,delay_unit=ns]` -- the names a crossing needs.
 
     Two namespaces in one argument, on purpose: `tdc` is a control-system channel while
     `speed` and `delay` are McStas parameter names. They are separate fields in `Chopper`
-    for the same reason.
+    for the same reason. Options come last, as `key=value`; the only one is the unit the
+    delay is published in, seconds unless it says otherwise.
     """
     parts = [p.strip() for p in text.split(',')]
-    if len(parts) not in (4, 5):
+    options = dict(p.split('=', 1) for p in parts if '=' in p)
+    names = [p for p in parts if '=' not in p]
+    unknown = set(options) - {'delay_unit'}
+    if len(names) not in (4, 5) or unknown:
         raise ValueError(
-            f'Expected name,tdc,speed,delay[,park] for a chopper; got {text!r}')
-    return Chopper(*parts)
+            f'Expected name,tdc,speed,delay[,park][,delay_unit=ns] for a chopper; '
+            f'got {text!r}')
+    return Chopper(*names, **options)
 
 
 def get_parser():
@@ -237,7 +242,7 @@ def get_parser():
     p = ArgumentParser(
         description='Serve fake chopper top-dead-centre times on the pulse grid')
     p.add_argument('-c', '--chopper', type=parse_chopper, action='append', default=[],
-                   metavar='name,tdc,speed,delay[,park]',
+                   metavar='name,tdc,speed,delay[,park][,delay_unit=ns]',
                    help='One disc chopper; repeat for each')
     p.add_argument('--pulse-pv', type=str, default='pulse',
                    help='PV carrying one reference sample per pulse')

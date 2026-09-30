@@ -99,8 +99,13 @@ def _parameter_defaults(instr) -> dict[str, float]:
     so appears nowhere in what the point hands over, but its disc is still turning.
     Publishing zero for it would be read downstream as a parked chopper.
     """
+    return parameter_defaults(instr.parameters)
+
+
+def parameter_defaults(parameters) -> dict[str, float]:
+    """`_parameter_defaults`, for the parameters rather than the instrument holding them."""
     out = {}
-    for parameter in instr.parameters:
+    for parameter in parameters:
         expression = parameter.value
         if not getattr(expression, 'has_value', False):
             continue
@@ -111,21 +116,30 @@ def _parameter_defaults(instr) -> dict[str, float]:
     return out
 
 
-def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str):
-    """A *pre*-point hook publishing what the choppers are about to be doing.
+def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str | None,
+                                               logs=()):
+    """A *pre*-point hook publishing what the point about to be traced is set to.
 
-    Before, not after. `mp-tdc` free-runs on the pulse grid and reads these PVs as it goes,
-    so they have to describe the point that is about to be traced rather than the one that
-    just finished -- the whole reason restage grew a pre-point hook.
+    Before, not after. `mp-tdc` free-runs on the pulse grid and reads the chopper PVs as it
+    goes, so they have to describe the point that is about to be traced rather than the
+    one that just finished -- the whole reason restage grew a pre-point hook. The same
+    holds for any other simulated log: a sample rotation scanned point by point has to
+    be on its PV while that point's events are being written.
+
+    Each PV is put the value of the parameter that fills it, which is not always a
+    parameter of the same name: a structure bound to a facility's names serves
+    `mcstas:BIFRO-SpRot:MC-RotZ-01:Mtr.RBV` from `sample_rotation`. ``logs`` are the
+    `orchestrate.SimulatedLog`s outside the choppers.
 
     Setting the run PV here rather than in `orchestrate` is deliberate: it keeps the
     crossings quiet through the primary MCPL stage, which produces no detector events and
     where these parameters still hold their defaults. The put is idempotent, so every point
-    may safely repeat it.
+    may safely repeat it. With no choppers there is no run PV to set.
     """
     from p4p.client.thread import Context
 
-    names = [n for c in choppers for n in (c.speed, c.delay, c.park) if n]
+    targets = [pair for c in choppers for pair in c.served()]
+    targets += [(log.source, log.parameter) for log in logs]
     defaults = _parameter_defaults(instr)
     missing: set[str] = set()
     context: list = []
@@ -135,32 +149,16 @@ def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str):
             context.append(Context('pva'))
         values = dict(defaults)
         values.update({str(k).lower(): v for k, v in pars.items()})
-        for name in names:
-            value = values.get(name.lower())
+        for pv, parameter in targets:
+            value = values.get(parameter.lower())
             if value is None:
-                if name not in missing:
-                    missing.add(name)
-                    print(f'warning: no instrument parameter named {name!r}; its '
-                          f'chopper log will hold whatever the PV was last set to')
+                if parameter not in missing:
+                    missing.add(parameter)
+                    print(f'warning: no instrument parameter named {parameter!r}; '
+                          f'{pv} will hold whatever it was last set to')
                 continue
-            context[0].put(name, float(value))
-        context[0].put(run_pv, 1)
+            context[0].put(pv, float(value))
+        if run_pv is not None and choppers:
+            context[0].put(run_pv, 1)
 
     return callback, {'pars': 'pars'}
-
-
-def main():
-    from .mccode import get_mcstas_instr
-    from restage.splitrun import splitrun_args, parse_splitrun
-    parser = make_parser()
-    parser.add_argument('--keep-after-send', action='store_true', help='Keep after sending histograms', default=False)
-    args, parameters, precision = parse_splitrun(parser)
-    instr = get_mcstas_instr(args.instrument)
-    callback, callback_args = monitors_to_kafka_callback_with_arguments(
-        broker=args.broker,
-        topic=args.topic,
-        source=args.source,
-        names=args.names,
-        delete_after_sending=not args.keep_after_send
-    )
-    return splitrun_args(instr, parameters, precision, args, callback=callback, callback_arguments=callback_args)
