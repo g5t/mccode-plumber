@@ -155,9 +155,13 @@ class NiessStructureTest(unittest.TestCase):
         return to_nexus_structure(instrument)
 
     def test_the_emitted_names_are_the_parameter_names(self):
+        """niess >= 0.8 names each knob for the ESS log it is published as, in that
+        log's unit, and says which parameter fills each log."""
         (chopper, _), = get_chopper_specs(self.structure())
         self.assertEqual((chopper.tdc, chopper.speed, chopper.delay, chopper.park),
-                         ('psc1_tdc', 'psc1speed', 'psc1delay', 'psc1park'))
+                         ('psc1_tdc', 'psc1_rotation_speed', 'psc1_delay', 'psc1_park_angle'))
+        self.assertEqual(chopper.parameter('delay'), 'psc1_delay')
+        self.assertEqual(chopper.delay_unit, 'ns')
 
     def test_the_pulse_reference_is_found(self):
         self.assertIsNotNone(get_pulse_stream(self.structure()))

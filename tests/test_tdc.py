@@ -26,6 +26,13 @@ class _Recorder:
         self.posts.append((value, timestamp))
 
 
+def forwarded(value, stamp):
+    """What the forwarder's `tdct` serialiser makes of a TDC PV: each element plus the
+    PV's own stamp, in nanoseconds (forwarder `tdct_serialiser.py`)."""
+    seconds, nanoseconds = stamp
+    return np.asarray(value).astype(np.uint64) + (seconds * NS + nanoseconds)
+
+
 def _wired(choppers, **kwargs):
     faker = FakeTDC(tuple(choppers), **kwargs)
     names = [c.tdc for c in choppers] + [faker.pulse_pv]
@@ -85,13 +92,29 @@ class EmitTest(unittest.TestCase):
     def test_the_pulse_sample_and_the_crossings_share_one_instant(self):
         """The load-bearing property. Stamping the reference from a fresh clock reading
         would put it *after* the crossings that are measured from it."""
-        pulse_ns = 1_788_000_000_000_000_000
+        pulse_ns = 1_788_000_000_123_456_789
         self.faker.emit(pulse_ns)
         (_, pulse_stamp), = self.faker.pvs['pulse'].posts
-        (times, tdc_stamp), = self.faker.pvs['psc1_tdc'].posts
-        self.assertEqual(pulse_stamp, pulse_ns / NS)
+        (_, tdc_stamp), = self.faker.pvs['psc1_tdc'].posts
+        self.assertEqual(pulse_stamp, (1_788_000_000, 123_456_789))
         self.assertEqual(tdc_stamp, pulse_stamp)
-        self.assertEqual(int(times[0]), pulse_ns + 5_000_000)
+
+    def test_the_pv_holds_offsets_from_its_stamp(self):
+        """The forwarder adds the stamp to every element, so absolute times on the PV
+        would reach the file with the epoch counted twice."""
+        self.faker.emit(1_788_000_000_000_000_000)
+        (offsets, _), = self.faker.pvs['psc1_tdc'].posts
+        self.assertEqual(int(offsets[0]), 5_000_000)
+
+    def test_what_is_forwarded_is_the_absolute_crossing_to_the_nanosecond(self):
+        """Exactly: a float stamp would lose ~240 ns at today's epoch, and the forwarder
+        adds back whatever the stamp says."""
+        pulse_ns = 1_788_000_000_123_456_789
+        self.faker.values.update({'psc1speed': 196.0})
+        self.faker.emit(pulse_ns)
+        (offsets, stamp), = self.faker.pvs['psc1_tdc'].posts
+        expected = DISC.crossings(pulse_ns, self.faker.values)
+        self.assertEqual([int(t) for t in forwarded(offsets, stamp)], expected)
 
     def test_the_vector_is_unsigned_64_bit(self):
         self.faker.emit(1_788_000_000_000_000_000)
@@ -123,7 +146,9 @@ class GridTest(unittest.TestCase):
         self.now += int(round(seconds * NS))
 
     def pulses(self):
-        return [int(times[0]) for times, _ in self.faker.pvs['psc1_tdc'].posts]
+        """The pulse each posted vector belongs to: its stamp, in nanoseconds."""
+        return [seconds * NS + nanoseconds
+                for _, (seconds, nanoseconds) in self.faker.pvs['psc1_tdc'].posts]
 
     def test_the_ticks_are_evenly_spaced_grid_instants(self):
         """Anchored on the epoch, not on start-up, and taken from the grid rather than

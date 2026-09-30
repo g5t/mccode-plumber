@@ -92,8 +92,14 @@ class MailboxHandler:
             pv.nt = NTScalar(val.type()['value'])
             pv._wrap = pv.nt.wrap
 
-        # Notify any subscribers of the new value, adding the timestamp, so they know when it was set.
-        pv.post(val, timestamp=datetime.now(timezone.utc).timestamp())
+        # Notify any subscribers of the new value, adding the timestamp, so they know when
+        # it was set -- unless the client stamped it itself. A replayed chopper's offsets
+        # are relative to the pulse they belong to, and the forwarder adds the stamp to
+        # them, so replacing it with the moment of the put would shift every crossing.
+        if val.changed('timeStamp') and val['timeStamp.secondsPastEpoch']:
+            pv.post(val)
+        else:
+            pv.post(val, timestamp=datetime.now(timezone.utc).timestamp())
         # Notify the client making this PUT operation that it has now completed
         op.done()
 

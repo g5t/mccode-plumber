@@ -111,11 +111,23 @@ class MailboxTestCase(unittest.TestCase):
         pub.publish(0, 'psc1delay', '0.0', 's')
         pub.pulse_ready(0, PULSE)
 
-        got = np.asarray(self.ctx.get(self.prefix + self.disc.tdc), dtype=np.uint64)
+        got = self.ctx.get(self.prefix + self.disc.tdc)
+        # the PV holds offsets from its stamp; the forwarder adds the stamp back
+        seconds, nanoseconds = got.raw_stamp
+        self.assertEqual(seconds * NS + nanoseconds, PULSE)
+        forwarded = np.asarray(got, dtype=np.uint64) + (seconds * NS + nanoseconds)
         expected = np.asarray(pub.choppers[0].crossings(
             PULSE, {'psc1speed': 196.0, 'psc1delay': 0.0}), dtype=np.uint64)
-        np.testing.assert_array_equal(got, expected)
-        self.assertEqual(int(got[0]), PULSE)
+        np.testing.assert_array_equal(forwarded, expected)
+        self.assertEqual(int(got[0]), 0)
+
+    def test_the_pulse_sample_keeps_the_pulse_instant(self):
+        """The mailbox keeps a stamp the client supplies rather than stamping the put."""
+        pub = self.publisher()
+        pub.publish(0, 'psc1speed', '14.0', 'Hz')
+        pub.pulse_ready(0, PULSE)
+        seconds, nanoseconds = self.ctx.get(self.prefix + 'pulse').raw_stamp
+        self.assertEqual(seconds * NS + nanoseconds, PULSE)
 
     def test_the_server_is_really_there(self):
         """A negative control: everything else here would pass against nothing at all
@@ -147,8 +159,10 @@ class MailboxTestCase(unittest.TestCase):
         pub.publish(0, 'psc1delay', '0.005', 's')
         for point, pulse in enumerate((PULSE, PULSE + round(NS / 14))):
             pub.pulse_ready(point, pulse)
-            got = np.asarray(self.ctx.get(self.prefix + self.disc.tdc), dtype=np.uint64)
-            self.assertEqual(int(got[0]), pulse + 5_000_000)
+            got = self.ctx.get(self.prefix + self.disc.tdc)
+            seconds, nanoseconds = got.raw_stamp
+            self.assertEqual(seconds * NS + nanoseconds, pulse)
+            self.assertEqual(int(np.asarray(got, dtype=np.uint64)[0]), 5_000_000)
 
 
 if __name__ == '__main__':
