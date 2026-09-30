@@ -745,7 +745,7 @@ def main():
     from mccode_plumber.mccode import get_mcstas_instr
     from restage.splitrun import parse_splitrun
     from mccode_plumber.splitrun import (
-        chopper_parameters_callback_with_arguments,
+        parameter_pvs_callback_with_arguments,
         monitors_to_kafka_callback_for_topics,
     )
     args, parameters, precision = parse_splitrun(make_splitrun_nexus_parser())
@@ -790,12 +790,13 @@ def main():
     # the source it names. Before each point they are put that point's values, as the
     # choppers' are, so a scanned sample rotation is logged as it was traced.
     simulated_logs = get_simulated_logs(structure, [c for c, _ in chopper_specs])
-    if chopper_specs or simulated_logs:
-        pre_callback, pre_callback_args = chopper_parameters_callback_with_arguments(
-            instr, [c for c, _ in chopper_specs], RUN_PV, logs=simulated_logs
-        )
-        splitrun_kwargs['pre_callback'] = pre_callback
-        splitrun_kwargs['pre_callback_arguments'] = pre_callback_args
+    # And every instrument parameter, to the mailbox PV /entry/parameters is filled from:
+    # the instrument does not need an UpdateEPICS component to publish them itself.
+    pre_callback, pre_callback_args = parameter_pvs_callback_with_arguments(
+        instr, [c for c, _ in chopper_specs], RUN_PV, logs=simulated_logs, prefix=PREFIX
+    )
+    splitrun_kwargs['pre_callback'] = pre_callback
+    splitrun_kwargs['pre_callback_arguments'] = pre_callback_args
     kwargs = {
         'nexus_file': args.nexus_file, 'structure_out': args.structure_out,
         'choppers': chopper_specs, 'pulse': pulse, 'simulated_logs': simulated_logs,

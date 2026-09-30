@@ -116,8 +116,24 @@ def parameter_defaults(parameters) -> dict[str, float]:
     return out
 
 
-def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str | None,
-                                               logs=()):
+def _numeric_parameters(instr) -> dict[str, type]:
+    """Every instrument parameter a PV can carry, and whether it is an int or a float.
+
+    Strings are left out: `f144` carries numbers only, which is also why the forwarder is
+    never told about them.
+    """
+    from mccode_antlr.common.expression import DataType
+    kinds = {DataType.int: int, DataType.float: float}
+    out = {}
+    for parameter in instr.parameters:
+        kind = kinds.get(getattr(parameter.value, 'data_type', None))
+        if kind is not None:
+            out[parameter.name] = kind
+    return out
+
+
+def parameter_pvs_callback_with_arguments(instr, choppers, run_pv: str | None,
+                                           logs=(), prefix: str | None = None):
     """A *pre*-point hook publishing what the point about to be traced is set to.
 
     Before, not after. `mp-tdc` free-runs on the pulse grid and reads the chopper PVs as it
@@ -131,6 +147,11 @@ def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str | No
     `mcstas:BIFRO-SpRot:MC-RotZ-01:Mtr.RBV` from `sample_rotation`. ``logs`` are the
     `orchestrate.SimulatedLog`s outside the choppers.
 
+    With ``prefix``, every numeric instrument parameter is also put to ``{prefix}{name}``:
+    the mailbox PVs `/entry/parameters` is filled from. That is what the `UpdateEPICS`
+    component used to do from inside the simulation; doing it here puts every value in
+    place before the point starts, and leaves the instrument free of an EPICS call-out.
+
     Setting the run PV here rather than in `orchestrate` is deliberate: it keeps the
     crossings quiet through the primary MCPL stage, which produces no detector events and
     where these parameters still hold their defaults. The put is idempotent, so every point
@@ -140,6 +161,10 @@ def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str | No
 
     targets = [pair for c in choppers for pair in c.served()]
     targets += [(log.source, log.parameter) for log in logs]
+    kinds = _numeric_parameters(instr) if prefix is not None else {}
+    targets += [(f'{prefix}{name}', name) for name in kinds]
+    # One put per PV: an unbound log's source is the mailbox's own name for its parameter.
+    targets = list(dict.fromkeys(targets))
     defaults = _parameter_defaults(instr)
     missing: set[str] = set()
     context: list = []
@@ -157,8 +182,13 @@ def chopper_parameters_callback_with_arguments(instr, choppers, run_pv: str | No
                     print(f'warning: no instrument parameter named {parameter!r}; '
                           f'{pv} will hold whatever it was last set to')
                 continue
-            context[0].put(pv, float(value))
+            kind = kinds.get(parameter, float) if pv == f'{prefix}{parameter}' else float
+            context[0].put(pv, kind(value))
         if run_pv is not None and choppers:
             context[0].put(run_pv, 1)
 
     return callback, {'pars': 'pars'}
+
+
+#: The name this had while it published only chopper values.
+chopper_parameters_callback_with_arguments = parameter_pvs_callback_with_arguments

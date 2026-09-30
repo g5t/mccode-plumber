@@ -255,3 +255,42 @@ class LoggedNamesTest(unittest.TestCase):
         for parameter in ('sample_rotation', 'detector_tank_angle', 'sample_jaws_left',
                           'pulse_shaping_chopper_1_delay'):
             self.assertIn(parameter, names)
+
+
+class EveryParameterTest(unittest.TestCase):
+    """With a prefix, every numeric parameter is put to its mailbox PV before the point.
+
+    That is what fills /entry/parameters, and what the instrument's UpdateEPICS
+    component used to do from inside the simulation.
+    """
+
+    def run_point(self, pars, *declarations, logs=()):
+        from mccode_antlr.common import InstrumentParameter
+        from mccode_plumber.splitrun import parameter_pvs_callback_with_arguments
+        instr = _FakeInstr()
+        instr.parameters = tuple(InstrumentParameter.parse(d) for d in declarations)
+        context = _FakeContext()
+        with patch('p4p.client.thread.Context', lambda *a, **k: context):
+            callback, _ = parameter_pvs_callback_with_arguments(
+                instr, [], 'tdc_run', logs=list(logs), prefix='mcstas:')
+            callback(pars=pars)
+        return context.puts
+
+    def test_every_numeric_parameter_reaches_its_mailbox_pv(self):
+        puts = dict(self.run_point({'a3': 30.0}, 'double a3 = 0', 'int order = 14',
+                                   'string mcpl_filename = "x"'))
+        self.assertEqual(puts, {'mcstas:a3': 30.0, 'mcstas:order': 14})
+
+    def test_an_integer_parameter_is_put_as_an_integer(self):
+        puts = dict(self.run_point({'order': 13}, 'int order = 14'))
+        self.assertIsInstance(puts['mcstas:order'], int)
+
+    def test_a_pv_that_is_both_a_log_and_a_parameter_is_put_once(self):
+        log = SimulatedLog('mask_left', 'mcstas:mask_left', 'bifrost_motion', 'double')
+        puts = self.run_point({}, 'double mask_left = -25', logs=[log])
+        self.assertEqual(puts, [('mcstas:mask_left', -25.0)])
+
+    def test_the_old_name_still_works(self):
+        from mccode_plumber import splitrun
+        self.assertIs(splitrun.chopper_parameters_callback_with_arguments,
+                      splitrun.parameter_pvs_callback_with_arguments)
