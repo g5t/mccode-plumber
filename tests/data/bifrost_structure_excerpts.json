@@ -1,0 +1,3705 @@
+{
+ "_comment": "BIFROST as niess writes it, cut down; see make_bifrost_structure_excerpts.py. `ecdc` is bifrost_streams(), a simulation named as ECDC binds the real instrument; `simulated` is the plain SIMULATED binder.",
+ "ecdc": {
+  "children": [
+   {
+    "name": "entry",
+    "type": "group",
+    "children": [
+     {
+      "name": "instrument",
+      "type": "group",
+      "children": [
+       {
+        "module": "dataset",
+        "config": {
+         "name": "name",
+         "values": "bifrost",
+         "dtype": "string"
+        }
+       },
+       {
+        "name": "source",
+        "type": "group",
+        "children": [
+         {
+          "module": "dataset",
+          "config": {
+           "name": "name",
+           "values": "ESS",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "probe",
+           "values": "neutron",
+           "dtype": "string"
+          }
+         },
+         {
+          "name": "current",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:TD-M:Ctrl-EVR-1:DbufBCurr-I",
+             "topic": "tn_data_general",
+             "dtype": "double",
+             "value_units": "mA"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "mA"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": ".",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXsource"
+         }
+        ]
+       },
+       {
+        "name": "pulse_shaping_chopper_1",
+        "type": "group",
+        "children": [
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slits",
+           "values": 1,
+           "dtype": "int64"
+          }
+         },
+         {
+          "name": "rotation_speed",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy1:Chop-PSC-101:Spd_R",
+             "topic": "bifrost_choppers",
+             "dtype": "double",
+             "value_units": "Hz"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "Hz"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "pulse_shaping_chopper_1_rotation_speed"
+           }
+          ]
+         },
+         {
+          "name": "top_dead_center",
+          "type": "group",
+          "children": [
+           {
+            "module": "tdct",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy1:Chop-PSC-101:00-TS-I",
+             "topic": "bifrost_choppers"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "default",
+            "dtype": "string",
+            "values": "time"
+           }
+          ]
+         },
+         {
+          "name": "delay",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy1:Chop-PSC-101:TotDly",
+             "topic": "bifrost_choppers",
+             "dtype": "double",
+             "value_units": "ns"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "ns"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "pulse_shaping_chopper_1_delay"
+           }
+          ]
+         },
+         {
+          "name": "park_angle",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy1:Chop-PSC-101:Pos_R",
+             "topic": "bifrost_choppers",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "pulse_shaping_chopper_1_park_angle"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_edges",
+           "values": [
+            95.0,
+            265.0
+           ],
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_angle",
+           "values": 170.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "beam_position",
+           "values": 180.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "radius",
+           "values": 0.35000000000000003,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_height",
+           "values": 0.054134,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 6.332892210259251,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               -0.00480721590924831,
+               0.05094079592552573,
+               0.9986901050804877
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": -0.5600000000000034,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/pulse_shaping_chopper_1/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/pulse_shaping_chopper_1/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "nose",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "pulse_shaping_chopper_2",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXdisk_chopper"
+         }
+        ]
+       },
+       {
+        "name": "bandwidth_chopper_2",
+        "type": "group",
+        "children": [
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slits",
+           "values": 1,
+           "dtype": "int64"
+          }
+         },
+         {
+          "name": "rotation_speed",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy2:Chop-BWC-102:Spd_R",
+             "topic": "bifrost_choppers",
+             "dtype": "double",
+             "value_units": "Hz"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "Hz"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "bandwidth_chopper_2_rotation_speed"
+           }
+          ]
+         },
+         {
+          "name": "top_dead_center",
+          "type": "group",
+          "children": [
+           {
+            "module": "tdct",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy2:Chop-BWC-102:01-TS-I",
+             "topic": "bifrost_choppers"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "default",
+            "dtype": "string",
+            "values": "time"
+           }
+          ]
+         },
+         {
+          "name": "delay",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy2:Chop-BWC-102:TotDly",
+             "topic": "bifrost_choppers",
+             "dtype": "double",
+             "value_units": "ns"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "ns"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "bandwidth_chopper_2_delay"
+           }
+          ]
+         },
+         {
+          "name": "park_angle",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-ChpSy2:Chop-BWC-102:Pos_R",
+             "topic": "bifrost_choppers",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "bandwidth_chopper_2_park_angle"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_edges",
+           "values": [
+            99.5,
+            260.5
+           ],
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_angle",
+           "values": 161.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "beam_position",
+           "values": 180.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "radius",
+           "values": 0.35000000000000003,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_height",
+           "values": 0.09845999999999999,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 78.01590284134802,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               -0.00016092717044230822,
+               0.0038387290869693054,
+               0.9999926191034825
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/bandwidth_chopper_2/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/bandwidth_chopper_2/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "bandwidth_chopper_1",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "unit_43_exit_window",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXdisk_chopper"
+         }
+        ]
+       },
+       {
+        "name": "divergence_slit_1",
+        "type": "group",
+        "children": [
+         {
+          "name": "left",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:BIFRO-DivSl1:MC-SlYp-01:Mtr.RBV",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "divergence_slit_1_left"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/divergence_slit_1/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "right",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:BIFRO-DivSl1:MC-SlYm-01:Mtr.RBV",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "divergence_slit_1_right"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/divergence_slit_1/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 158.95882523876114,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0007866654352712562,
+               0.0,
+               0.9999996905786985
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/divergence_slit_1/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/divergence_slit_1/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "unit_85_closing",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "unit_86_closing",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXaperture"
+         }
+        ]
+       },
+       {
+        "name": "mask",
+        "type": "group",
+        "children": [
+         {
+          "name": "left",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:mask_left",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_left"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "right",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:mask_right",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_right"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "bottom",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:mask_bottom",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_bottom"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "top",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:mask_top",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_top"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 161.42582422557217,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.000800623197141271,
+               0.0,
+               0.9999996795011968
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/mask/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/mask/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "unit_88_exit_window",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "normalization_monitor",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXaperture"
+         }
+        ]
+       },
+       {
+        "name": "sample_jaws",
+        "type": "group",
+        "children": [
+         {
+          "name": "left",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:BIFRO-SpSl1:MC-SlYp-01:PzMtr.RBV",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_left"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "right",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:BIFRO-SpSl1:MC-SlYm-01:PzMtr.RBV",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_right"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "bottom",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:BIFRO-SpSl1:MC-SlZm-01:PzMtr.RBV",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_bottom"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "top",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mcstas:BIFRO-SpSl1:MC-SlZp-01:PzMtr.RBV",
+               "topic": "bifrost_motion",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_top"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 161.45082421546329,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0008007624586254833,
+               0.0,
+               0.9999996793896909
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/sample_jaws/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "normalization_monitor",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "sample_origin",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXaperture"
+         }
+        ]
+       },
+       {
+        "name": "sample_rotation",
+        "type": "group",
+        "children": [
+         {
+          "name": "value",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-SpRot:MC-RotZ-01:Mtr.RBV",
+             "topic": "bifrost_motion",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "transformation_type",
+            "dtype": "string",
+            "values": "rotation"
+           },
+           {
+            "name": "vector",
+            "dtype": "double",
+            "values": [
+             0.0,
+             1.0,
+             0.0
+            ]
+           },
+           {
+            "name": "depends_on",
+            "dtype": "string",
+            "values": "."
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "sample_rotation"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": ".",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXpositioner"
+         }
+        ]
+       },
+       {
+        "name": "detector_tank_angle",
+        "type": "group",
+        "children": [
+         {
+          "name": "value",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "mcstas:BIFRO-DtCar:MC-RotZ-01:Mtr.RBV",
+             "topic": "bifrost_motion",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "transformation_type",
+            "dtype": "string",
+            "values": "rotation"
+           },
+           {
+            "name": "vector",
+            "dtype": "double",
+            "values": [
+             0.0,
+             1.0,
+             0.0
+            ]
+           },
+           {
+            "name": "depends_on",
+            "dtype": "string",
+            "values": "."
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "detector_tank_angle"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": ".",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXpositioner"
+         }
+        ]
+       },
+       {
+        "name": "channel_1_1_triplet",
+        "type": "group",
+        "children": [
+         {
+          "name": "data",
+          "type": "group",
+          "children": [
+           {
+            "module": "ev44",
+            "config": {
+             "source": "arc=0;triplet=0",
+             "topic": "bifrost_detector"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXevent_data"
+           }
+          ]
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXdetector"
+         }
+        ]
+       }
+      ],
+      "attributes": [
+       {
+        "name": "NX_class",
+        "dtype": "string",
+        "values": "NXinstrument"
+       }
+      ]
+     }
+    ],
+    "attributes": [
+     {
+      "name": "NX_class",
+      "dtype": "string",
+      "values": "NXentry"
+     }
+    ]
+   }
+  ]
+ },
+ "simulated": {
+  "children": [
+   {
+    "name": "entry",
+    "type": "group",
+    "children": [
+     {
+      "name": "instrument",
+      "type": "group",
+      "children": [
+       {
+        "module": "dataset",
+        "config": {
+         "name": "name",
+         "values": "bifrost",
+         "dtype": "string"
+        }
+       },
+       {
+        "name": "source",
+        "type": "group",
+        "children": [
+         {
+          "module": "dataset",
+          "config": {
+           "name": "name",
+           "values": "ESS",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "probe",
+           "values": "neutron",
+           "dtype": "string"
+          }
+         },
+         {
+          "name": "current",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "pulse",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "mA"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "mA"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": ".",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXsource"
+         }
+        ]
+       },
+       {
+        "name": "pulse_shaping_chopper_1",
+        "type": "group",
+        "children": [
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slits",
+           "values": 1,
+           "dtype": "int64"
+          }
+         },
+         {
+          "name": "rotation_speed",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "pulse_shaping_chopper_1_rotation_speed",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "Hz"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "Hz"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "pulse_shaping_chopper_1_rotation_speed"
+           }
+          ]
+         },
+         {
+          "name": "top_dead_center",
+          "type": "group",
+          "children": [
+           {
+            "module": "tdct",
+            "config": {
+             "source": "pulse_shaping_chopper_1_tdc",
+             "topic": "choppers"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "default",
+            "dtype": "string",
+            "values": "time"
+           }
+          ]
+         },
+         {
+          "name": "delay",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "pulse_shaping_chopper_1_delay",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "ns"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "ns"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "pulse_shaping_chopper_1_delay"
+           }
+          ]
+         },
+         {
+          "name": "park_angle",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "pulse_shaping_chopper_1_park_angle",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "pulse_shaping_chopper_1_park_angle"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_edges",
+           "values": [
+            95.0,
+            265.0
+           ],
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_angle",
+           "values": 170.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "beam_position",
+           "values": 180.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "radius",
+           "values": 0.35000000000000003,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_height",
+           "values": 0.054134,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 6.332892210259251,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               -0.00480721590924831,
+               0.05094079592552573,
+               0.9986901050804877
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": -0.5600000000000034,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/pulse_shaping_chopper_1/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/pulse_shaping_chopper_1/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "nose",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "pulse_shaping_chopper_2",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXdisk_chopper"
+         }
+        ]
+       },
+       {
+        "name": "bandwidth_chopper_2",
+        "type": "group",
+        "children": [
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slits",
+           "values": 1,
+           "dtype": "int64"
+          }
+         },
+         {
+          "name": "rotation_speed",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "bandwidth_chopper_2_rotation_speed",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "Hz"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "Hz"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "bandwidth_chopper_2_rotation_speed"
+           }
+          ]
+         },
+         {
+          "name": "top_dead_center",
+          "type": "group",
+          "children": [
+           {
+            "module": "tdct",
+            "config": {
+             "source": "bandwidth_chopper_2_tdc",
+             "topic": "choppers"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "default",
+            "dtype": "string",
+            "values": "time"
+           }
+          ]
+         },
+         {
+          "name": "delay",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "bandwidth_chopper_2_delay",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "ns"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "ns"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "bandwidth_chopper_2_delay"
+           }
+          ]
+         },
+         {
+          "name": "park_angle",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "bandwidth_chopper_2_park_angle",
+             "topic": "choppers",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "bandwidth_chopper_2_park_angle"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_edges",
+           "values": [
+            99.5,
+            260.5
+           ],
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_angle",
+           "values": 161.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "beam_position",
+           "values": 180.0,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "degrees"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "radius",
+           "values": 0.35000000000000003,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "slit_height",
+           "values": 0.09845999999999999,
+           "dtype": "double"
+          },
+          "attributes": [
+           {
+            "name": "units",
+            "dtype": "string",
+            "values": "m"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 78.01590284134802,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               -0.00016092717044230822,
+               0.0038387290869693054,
+               0.9999926191034825
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/bandwidth_chopper_2/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/bandwidth_chopper_2/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "bandwidth_chopper_1",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "unit_43_exit_window",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXdisk_chopper"
+         }
+        ]
+       },
+       {
+        "name": "divergence_slit_1",
+        "type": "group",
+        "children": [
+         {
+          "name": "left",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "divergence_slit_1_left",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "divergence_slit_1_left"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/divergence_slit_1/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "right",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "divergence_slit_1_right",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "divergence_slit_1_right"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/divergence_slit_1/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 158.95882523876114,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0007866654352712562,
+               0.0,
+               0.9999996905786985
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/divergence_slit_1/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/divergence_slit_1/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "unit_85_closing",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "unit_86_closing",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXaperture"
+         }
+        ]
+       },
+       {
+        "name": "mask",
+        "type": "group",
+        "children": [
+         {
+          "name": "left",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mask_left",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_left"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "right",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mask_right",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_right"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "bottom",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mask_bottom",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_bottom"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "top",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "mask_top",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "mask_top"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/mask/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 161.42582422557217,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.000800623197141271,
+               0.0,
+               0.9999996795011968
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/mask/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/mask/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "unit_88_exit_window",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "normalization_monitor",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXaperture"
+         }
+        ]
+       },
+       {
+        "name": "sample_jaws",
+        "type": "group",
+        "children": [
+         {
+          "name": "left",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "sample_jaws_left",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_left"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "right",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "sample_jaws_right",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_right"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "bottom",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "sample_jaws_bottom",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_bottom"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "top",
+          "type": "group",
+          "children": [
+           {
+            "name": "value",
+            "type": "group",
+            "children": [
+             {
+              "module": "f144",
+              "config": {
+               "source": "sample_jaws_top",
+               "topic": "motors",
+               "dtype": "double",
+               "value_units": "mm"
+              },
+              "attributes": [
+               {
+                "name": "units",
+                "dtype": "string",
+                "values": "mm"
+               }
+              ]
+             }
+            ],
+            "attributes": [
+             {
+              "name": "NX_class",
+              "dtype": "string",
+              "values": "NXlog"
+             },
+             {
+              "name": "simulation_parameter",
+              "dtype": "string",
+              "values": "sample_jaws_top"
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "depends_on",
+             "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+             "dtype": "string"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXpositioner"
+           }
+          ]
+         },
+         {
+          "name": "transformations",
+          "type": "group",
+          "children": [
+           {
+            "module": "dataset",
+            "config": {
+             "name": "translation",
+             "values": 161.45082421546329,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "m"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "translation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0008007624586254833,
+               0.0,
+               0.9999996793896909
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "."
+             }
+            ]
+           },
+           {
+            "module": "dataset",
+            "config": {
+             "name": "rotation_y",
+             "values": 0.09740161901065549,
+             "dtype": "double"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             },
+             {
+              "name": "transformation_type",
+              "dtype": "string",
+              "values": "rotation"
+             },
+             {
+              "name": "vector",
+              "dtype": "double",
+              "values": [
+               0.0,
+               1.0,
+               0.0
+              ]
+             },
+             {
+              "name": "depends_on",
+              "dtype": "string",
+              "values": "/entry/instrument/sample_jaws/transformations/translation"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXtransformations"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": "/entry/instrument/sample_jaws/transformations/rotation_y",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "inputs",
+           "values": "normalization_monitor",
+           "dtype": "string"
+          }
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "outputs",
+           "values": "sample_origin",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXaperture"
+         }
+        ]
+       },
+       {
+        "name": "sample_rotation",
+        "type": "group",
+        "children": [
+         {
+          "name": "value",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "sample_rotation",
+             "topic": "bifrost_motion",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "transformation_type",
+            "dtype": "string",
+            "values": "rotation"
+           },
+           {
+            "name": "vector",
+            "dtype": "double",
+            "values": [
+             0.0,
+             1.0,
+             0.0
+            ]
+           },
+           {
+            "name": "depends_on",
+            "dtype": "string",
+            "values": "."
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "sample_rotation"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": ".",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXpositioner"
+         }
+        ]
+       },
+       {
+        "name": "detector_tank_angle",
+        "type": "group",
+        "children": [
+         {
+          "name": "value",
+          "type": "group",
+          "children": [
+           {
+            "module": "f144",
+            "config": {
+             "source": "detector_tank_angle",
+             "topic": "bifrost_motion",
+             "dtype": "double",
+             "value_units": "degrees"
+            },
+            "attributes": [
+             {
+              "name": "units",
+              "dtype": "string",
+              "values": "degrees"
+             }
+            ]
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXlog"
+           },
+           {
+            "name": "transformation_type",
+            "dtype": "string",
+            "values": "rotation"
+           },
+           {
+            "name": "vector",
+            "dtype": "double",
+            "values": [
+             0.0,
+             1.0,
+             0.0
+            ]
+           },
+           {
+            "name": "depends_on",
+            "dtype": "string",
+            "values": "."
+           },
+           {
+            "name": "simulation_parameter",
+            "dtype": "string",
+            "values": "detector_tank_angle"
+           }
+          ]
+         },
+         {
+          "module": "dataset",
+          "config": {
+           "name": "depends_on",
+           "values": ".",
+           "dtype": "string"
+          }
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXpositioner"
+         }
+        ]
+       },
+       {
+        "name": "channel_1_1_triplet",
+        "type": "group",
+        "children": [
+         {
+          "name": "data",
+          "type": "group",
+          "children": [
+           {
+            "module": "ev44",
+            "config": {
+             "source": "arc=0;triplet=0",
+             "topic": "bifrost_detector"
+            }
+           }
+          ],
+          "attributes": [
+           {
+            "name": "NX_class",
+            "dtype": "string",
+            "values": "NXevent_data"
+           }
+          ]
+         }
+        ],
+        "attributes": [
+         {
+          "name": "NX_class",
+          "dtype": "string",
+          "values": "NXdetector"
+         }
+        ]
+       }
+      ],
+      "attributes": [
+       {
+        "name": "NX_class",
+        "dtype": "string",
+        "values": "NXinstrument"
+       }
+      ]
+     }
+    ],
+    "attributes": [
+     {
+      "name": "NX_class",
+      "dtype": "string",
+      "values": "NXentry"
+     }
+    ]
+   }
+  ]
+ }
+}

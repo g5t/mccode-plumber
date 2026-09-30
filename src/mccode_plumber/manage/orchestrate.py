@@ -260,15 +260,41 @@ def _find_groups(data, nx_class: str, out: list | None = None) -> list[dict]:
     return out
 
 
-def _log_stream(group: dict, name: str) -> tuple[str | None, str, str | None] | None:
-    """The (module, source, topic) of the stream filling one named NXlog child."""
+#: The attribute on an NXlog naming the instrument parameter a simulation fills it from.
+#: niess writes it on every log it simulates. A structure bound to a facility's names has
+#: sources that look nothing like the parameters, so this is the only way to tell which
+#: value each PV should carry.
+SIMULATION_PARAMETER = 'simulation_parameter'
+
+
+def _attribute(node: dict, name: str):
+    for attribute in node.get('attributes') or ():
+        if isinstance(attribute, dict) and attribute.get('name') == name:
+            return attribute.get('values')
+    return None
+
+
+def _log_node(group: dict, name: str) -> dict | None:
+    """One named child of a group."""
     for child in group.get('children') or ():
         if isinstance(child, dict) and child.get('name') == name:
-            for stream in child.get('children') or ():
-                config = stream.get('config') or {}
-                if 'source' in config:
-                    return stream.get('module'), config['source'], config.get('topic')
+            return child
     return None
+
+
+def _node_stream(node: dict | None) -> tuple[str | None, str, str | None, dict] | None:
+    """The (module, source, topic, config) of the stream filling one NXlog."""
+    for stream in (node or {}).get('children') or ():
+        config = stream.get('config') or {}
+        if 'source' in config:
+            return stream.get('module'), config['source'], config.get('topic'), config
+    return None
+
+
+def _log_stream(group: dict, name: str) -> tuple[str | None, str, str | None] | None:
+    """The (module, source, topic) of the stream filling one named NXlog child."""
+    found = _node_stream(_log_node(group, name))
+    return None if found is None else found[:3]
 
 
 def _module_stream(group: dict, module: str) -> tuple[str | None, str | None] | None:
@@ -291,47 +317,138 @@ def get_chopper_specs(structure) -> list[tuple[Chopper, str]]:
     follow from -- so reading them from here is what guarantees the PVs served are the
     same names the file-writer is waiting on.
 
-    A group written for a *real* run is skipped rather than faked: its speed and delay are
-    the control system's own PVs, and its crossings are measured by an actual pickup.
-    ESS spells that group's electronic delay `delay`; niess deliberately spells the McStas
-    one `mark_delay`, because they are different quantities.
+    A disc is simulated when its logs name the parameters that fill them
+    (`simulation_parameter`), or when it has niess' old `mark_delay` log in seconds. A
+    group with a `delay` and no parameters was written for a *real* run and is skipped
+    rather than faked: its values are the control system's own PVs, and its crossings are
+    measured by an actual pickup.
+
+    The delay's unit is read off its log -- ESS publishes TotDly in nanoseconds -- so
+    the crossings are computed from the number actually published.
     """
+    from mccode_plumber.conductor import DELAY_UNITS
     specs = []
     for group in _find_groups(structure, 'NXdisk_chopper'):
         name = group.get('name')
         tdc = _module_stream(group, 'tdct')
-        speed = _log_stream(group, 'rotation_speed')
-        delay = _log_stream(group, 'mark_delay')
-        if tdc is None or speed is None:
+        speed = _log_node(group, 'rotation_speed')
+        if tdc is None or _node_stream(speed) is None:
             continue
-        if delay is None:
-            if _log_stream(group, 'delay') is not None:
-                continue        # a real chopper; nothing here to fake
+        legacy = _log_node(group, 'mark_delay')
+        delay = legacy if legacy is not None else _log_node(group, 'delay')
+        park = _log_node(group, 'park_angle')
+        simulated = legacy is not None or any(
+            _attribute(node, SIMULATION_PARAMETER) for node in (speed, delay, park)
+            if node is not None)
+        if _node_stream(delay) is None:
+            # Checked before `simulated`: a real ESS disc always has a delay, so one with
+            # none is an instrument whose knob is something else.
             raise ValueError(
-                f"Chopper {name!r} declares top-dead-centre times but no 'mark_delay' "
-                f"log to compute them from. An instrument whose delay knob is a phase "
-                f"in degrees cannot be faked from seconds; give the disc a delay "
-                f"parameter, or drop its top_dead_center log."
+                f"Chopper {name!r} declares top-dead-centre times but no 'delay' log to "
+                f"compute them from. An instrument whose delay knob is a phase in "
+                f"degrees cannot be faked from a time; give the disc a delay parameter, "
+                f"or drop its top_dead_center log."
             )
-        park = _log_stream(group, 'park_angle')
-        specs.append((Chopper(name=name, tdc=tdc[0], speed=speed[1], delay=delay[1],
-                              park=park[1] if park else None),
-                      tdc[1] or TOPICS['parameter']))
+        if not simulated:
+            continue            # a real chopper; nothing here to fake
+        unit = _node_stream(delay)[3].get('value_units') or 's'
+        if unit not in DELAY_UNITS:
+            raise ValueError(f"Chopper {name!r} publishes its delay in {unit!r}, which is "
+                             f"not a time unit this understands ({sorted(DELAY_UNITS)})")
+        park_stream = _node_stream(park)
+        specs.append((Chopper(
+            name=name, tdc=tdc[0],
+            speed=_node_stream(speed)[1], delay=_node_stream(delay)[1],
+            park=park_stream[1] if park_stream else None,
+            speed_parameter=_attribute(speed, SIMULATION_PARAMETER),
+            delay_parameter=_attribute(delay, SIMULATION_PARAMETER),
+            park_parameter=_attribute(park, SIMULATION_PARAMETER) if park else None,
+            delay_unit=unit,
+        ), tdc[1] or TOPICS['parameter']))
     return specs
+
+
+#: What the per-pulse reference log is called, newest first. ECDC names the accelerator's
+#: NXsource `source` and its proton current log `current`; niess before 0.8 wrote
+#: `neutron_prod_info` and `current_log`.
+PULSE_LOG_NAMES = ('current', 'current_log')
 
 
 def get_pulse_stream(structure) -> tuple[str, str] | None:
     """Where the per-pulse reference sample goes.
 
     A top-dead-centre time is meaningless on its own -- it is measured *from* a pulse --
-    so the instrument records its reference times as one sample per pulse under
-    `neutron_prod_info`. Everything in the file shares them.
+    so the instrument records its reference times as one sample per pulse in its
+    `NXsource`. Everything in the file shares them.
     """
     for group in _find_groups(structure, 'NXsource'):
-        stream = _log_stream(group, 'current_log')
-        if stream is not None:
-            return stream[1], stream[2] or TOPICS['parameter']
+        for name in PULSE_LOG_NAMES:
+            stream = _log_stream(group, name)
+            if stream is not None:
+                return stream[1], stream[2] or TOPICS['parameter']
     return None
+
+
+class SimulatedLog(NamedTuple):
+    """One NXlog a simulation fills from an instrument parameter, outside any chopper."""
+    parameter: str
+    source: str
+    topic: str
+    dtype: str
+
+
+def get_simulated_logs(structure, choppers=()) -> list[SimulatedLog]:
+    """Every log the structure says a parameter fills, except the choppers' own.
+
+    A chopper's values are served by `mp-tdc`, which computes its crossings from them;
+    everything else -- a jaw's edge, the sample rotation -- is served by the mailbox.
+    One entry per source, in the order the structure gives them: one knob turning two
+    frames is one PV.
+    """
+    excluded = {pv for chopper in choppers for pv, _ in chopper.served()}
+    found, seen = [], set()
+    for group in _find_groups(structure, 'NXlog'):
+        parameter = _attribute(group, SIMULATION_PARAMETER)
+        stream = _node_stream(group)
+        if not parameter or stream is None or stream[0] != 'f144':
+            continue
+        module, source, topic, config = stream
+        if source in excluded or source in seen:
+            continue
+        seen.add(source)
+        found.append(SimulatedLog(parameter, source, topic or TOPICS['parameter'],
+                                  config.get('dtype') or 'double'))
+    return found
+
+
+#: pvData type codes for the f144 dtypes a simulated log may declare.
+_PV_TYPE_CODES = {'double': 'd', 'float64': 'd', 'float': 'f', 'float32': 'f',
+                  'int64': 'l', 'int32': 'i', 'int': 'i', 'int16': 'h', 'int8': 'b'}
+
+
+def simulated_log_strings(logs, parameters, prefix: str = PREFIX) -> list[str]:
+    """Mailbox PV declarations, in `mp-epics-strings` form, for the simulated logs.
+
+    Served under exactly the source the structure names, starting from the parameter's
+    default. A log whose source is already the mailbox's own name for its parameter
+    (``mcstas:<name>``) is left out: the mailbox serves that one anyway.
+    """
+    from mccode_plumber.splitrun import parameter_defaults
+    defaults = parameter_defaults(parameters)
+    out = []
+    for log in logs:
+        if log.source == f'{prefix}{log.parameter}':
+            continue
+        code = _PV_TYPE_CODES.get(log.dtype, 'd')
+        default = defaults.get(log.parameter.lower(), 0.0)
+        default = int(default) if code in 'bhil' else float(default)
+        out.append(f'{log.source}:{code}:{default}')
+    return out
+
+
+def simulated_log_forwarder_streams(logs) -> list[dict]:
+    """Forwarder declarations for the simulated logs, each on the topic it names."""
+    return [dict(source=log.source, module='f144', topic=log.topic) for log in logs]
 
 
 def chopper_forwarder_streams(specs, pulse) -> list[dict]:
@@ -452,12 +569,14 @@ def services():
     structure_path = Path(args.structure or Path(args.instrument).with_suffix('.json'))
     structure = load_file_json(structure_path) if structure_path.exists() else {}
     streams = get_stream_modules(structure)
+    choppers = get_chopper_specs(structure)
     kwargs = {
         'instr_name': instr_name,
         'instr_parameters': instr_parameters,
         'broker': args.broker or 'localhost:9092',
         'efu': args.efu,
-        'choppers': get_chopper_specs(structure),
+        'choppers': choppers,
+        'simulated_logs': get_simulated_logs(structure, [c for c, _ in choppers]),
         'pulse': get_pulse_stream(structure),
         'work': args.writer_working_dir,
         'verbosity_writer': args.writer_verbosity,
@@ -481,6 +600,7 @@ def load_in_wait_load_out(
         verbosity_forwarder: str | None = None,
         event_topic: str | None = None,
         stream_topics: list[str] | None = None,
+        simulated_logs: list[SimulatedLog] | None = None,
     ):
         import signal
         from time import sleep
@@ -537,6 +657,8 @@ def load_in_wait_load_out(
                     style=Fore.YELLOW + Back.LIGHTCYAN_EX,
                     parameters=instr_parameters,
                     prefix=PREFIX,
+                    # the simulated logs' own sources, which the structure names outright
+                    exact=simulated_log_strings(simulated_logs or (), instr_parameters),
                 ),
                 KafkaToNexus.start(
                     name='K2N',
@@ -623,7 +745,7 @@ def main():
     from mccode_plumber.mccode import get_mcstas_instr
     from restage.splitrun import parse_splitrun
     from mccode_plumber.splitrun import (
-        chopper_parameters_callback_with_arguments,
+        parameter_pvs_callback_with_arguments,
         monitors_to_kafka_callback_for_topics,
     )
     args, parameters, precision = parse_splitrun(make_splitrun_nexus_parser())
@@ -664,15 +786,20 @@ def main():
     # names published here are the stream sources it is waiting on.
     chopper_specs = get_chopper_specs(structure)
     pulse = get_pulse_stream(structure)
-    if chopper_specs:
-        pre_callback, pre_callback_args = chopper_parameters_callback_with_arguments(
-            instr, [c for c, _ in chopper_specs], RUN_PV
-        )
-        splitrun_kwargs['pre_callback'] = pre_callback
-        splitrun_kwargs['pre_callback_arguments'] = pre_callback_args
+    # Every other log the structure says a parameter fills, served by the mailbox under
+    # the source it names. Before each point they are put that point's values, as the
+    # choppers' are, so a scanned sample rotation is logged as it was traced.
+    simulated_logs = get_simulated_logs(structure, [c for c, _ in chopper_specs])
+    # And every instrument parameter, to the mailbox PV /entry/parameters is filled from:
+    # the instrument does not need an UpdateEPICS component to publish them itself.
+    pre_callback, pre_callback_args = parameter_pvs_callback_with_arguments(
+        instr, [c for c, _ in chopper_specs], RUN_PV, logs=simulated_logs, prefix=PREFIX
+    )
+    splitrun_kwargs['pre_callback'] = pre_callback
+    splitrun_kwargs['pre_callback_arguments'] = pre_callback_args
     kwargs = {
         'nexus_file': args.nexus_file, 'structure_out': args.structure_out,
-        'choppers': chopper_specs, 'pulse': pulse,
+        'choppers': chopper_specs, 'pulse': pulse, 'simulated_logs': simulated_logs,
     }
     # restage's parser is the base of ours, so strip the arguments only this layer added
     # before the Namespace is handed back to it. Named rather than taken from `kwargs`,
@@ -708,6 +835,7 @@ def orchestrate(
         structure_out: str | None = None,
         choppers: list | None = None,
         pulse: tuple[str, str] | None = None,
+        simulated_logs: list[SimulatedLog] | None = None,
 ):
     from datetime import datetime, timezone
     from restage.splitrun import splitrun_args
@@ -726,6 +854,7 @@ def orchestrate(
     # parameters unprefixed: those PV names came out of the structure already.
     partial_streams = forwarder_partial_streams(PREFIX, TOPICS['parameter'], instr.parameters)
     partial_streams += chopper_forwarder_streams(choppers or [], pulse)
+    partial_streams += simulated_log_forwarder_streams(simulated_logs or ())
     forwarder_config = f"{broker}/{TOPICS['config']}"
     configure_forwarder(partial_streams, forwarder_config, PREFIX, TOPICS['parameter'])
 

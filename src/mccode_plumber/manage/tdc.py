@@ -37,5 +37,7 @@ class TDCFaker(Manager):
                 '--run-pv', self.run_pv, '--rate', str(self.rate)]
         for c in self.choppers:
             names = [c.name, c.tdc, c.speed, c.delay] + ([c.park] if c.park else [])
+            if c.delay_unit != 's':
+                names.append(f'delay_unit={c.delay_unit}')
             argv += ['--chopper', ','.join(names)]
         return argv

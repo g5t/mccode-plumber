@@ -17,10 +17,14 @@ class EPICSMailbox(Manager):
     strings:    optional list of NT parameter information to configure the
                 mailbox when the instrument parameters are not available for
                 use in determining the same information.
+    exact:      NT information for PVs served under exactly the name given,
+                without the prefix -- the sources a NeXus structure's simulated
+                logs name outright.
     """
     parameters: tuple[InstrumentParameter, ...]
     prefix: str
     strings: list[str] = field(default_factory=list)
+    exact: list[str] = field(default_factory=list)
     _command: Path = field(default_factory=lambda: Path('mp-epics-strings'))
 
     def __post_init__(self):
@@ -30,4 +34,7 @@ class EPICSMailbox(Manager):
             self.strings = instr_par_nt_to_strings(self.parameters)
 
     def __run_command__(self) -> list[str]:
-        return [self._command.as_posix(), '--prefix', self.prefix] + self.strings
+        argv = [self._command.as_posix(), '--prefix', self.prefix]
+        for string in self.exact:
+            argv.append(f'--exact={string}')
+        return argv + self.strings

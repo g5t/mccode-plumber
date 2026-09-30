@@ -26,27 +26,59 @@ from typing import Optional
 NS = 1_000_000_000
 
 
+#: Seconds per unit, for the units a disc's delay may be published in. ESS publishes a
+#: chopper's TotDly in nanoseconds; niess before 0.8 wrote its `mark_delay` in seconds.
+DELAY_UNITS = {'s': 1.0, 'ms': 1e-3, 'us': 1e-6, 'ns': 1e-9}
+
+
 @dataclass(frozen=True)
 class Chopper:
     """One disc, and where its numbers live.
 
-    ``speed`` and ``delay`` name *instrument parameters* -- what the simulation recorded
-    -- while ``tdc`` names the *PV* the computed timestamps are written to. The two are
-    deliberately different namespaces: one is what McStas called the knob, the other is
-    what the control system calls the channel.
+    ``speed``, ``delay`` and ``park`` name the *PVs* its values are served on, and ``tdc``
+    the PV the computed timestamps are written to -- what the control system calls each
+    channel. The ``*_parameter`` fields name the *instrument parameters* those values come
+    from -- what McStas called the knob. For a disc bound to a facility's names the two
+    differ (``mcstas:BIFRO-ChpSy1:Chop-PSC-101:Spd_R`` against
+    ``pulse_shaping_chopper_1_rotation_speed``); left unset, a parameter is named like its
+    PV, which is how a structure without `simulation_parameter` attributes spells it.
+
+    ``delay_unit`` is the unit the delay is published in, one of `DELAY_UNITS`.
     """
     name: str
     tdc: str
     speed: str
     delay: str
     park: Optional[str] = None
+    speed_parameter: Optional[str] = None
+    delay_parameter: Optional[str] = None
+    park_parameter: Optional[str] = None
+    delay_unit: str = 's'
 
-    def crossings(self, pulse_ns: int, values: dict[str, float]) -> list[int]:
+    def __post_init__(self):
+        if self.delay_unit not in DELAY_UNITS:
+            raise ValueError(f'Chopper {self.name!r}: unknown delay unit '
+                             f'{self.delay_unit!r}; expected one of {sorted(DELAY_UNITS)}')
+
+    def parameter(self, which: str) -> Optional[str]:
+        """The instrument parameter behind one of ``speed``, ``delay`` or ``park``."""
+        return getattr(self, f'{which}_parameter') or getattr(self, which)
+
+    def served(self) -> list[tuple[str, str]]:
+        """``(pv, parameter)`` for every value this disc's PVs carry."""
+        return [(getattr(self, which), self.parameter(which))
+                for which in ('speed', 'delay', 'park') if getattr(self, which)]
+
+    def crossings(self, pulse_ns: int, values: dict[str, float],
+                  by_parameter: bool = False) -> list[int]:
         """When the disc's mark passes, over one pulse, as absolute nanoseconds.
 
         The disc turns at ``speed`` and its mark reaches the beam ``delay`` after the
         pulse, so the crossings are ``delay + k/|speed|`` -- the same arithmetic the
         emitted McStas already does to offset each opening from the disc's own delay.
+
+        ``values`` is keyed by PV name, or by parameter name with ``by_parameter``: the
+        server reads what was put to its PVs, the replayer what the simulation recorded.
 
         A stationary disc has no crossings at all. It is not an error and not an empty
         measurement: a parked chopper genuinely never triggers its sensor, and saying so
@@ -57,10 +89,13 @@ class Chopper:
         the later ones legitimately fall after the next pulse begins; truncating them
         would silently drop real events.
         """
-        speed = float(values.get(self.speed, 0.0))
+        speed_key = self.parameter('speed') if by_parameter else self.speed
+        delay_key = self.parameter('delay') if by_parameter else self.delay
+        speed = float(values.get(speed_key, 0.0))
         if not speed:
             return []
-        delay_ns = int(round(float(values.get(self.delay, 0.0)) * NS))
+        delay = float(values.get(delay_key, 0.0)) * DELAY_UNITS[self.delay_unit]
+        delay_ns = int(round(delay * NS))
         period_ns = int(round(NS / abs(speed)))
         if period_ns <= 0:
             return []
@@ -115,7 +150,7 @@ class ChopperPublisher:
         self._put(self.pulse_pv, self.pulse_value)
         numbers = self._numeric_values()
         for chopper in self.choppers:
-            times = chopper.crossings(pulse_ns, numbers)
+            times = chopper.crossings(pulse_ns, numbers, by_parameter=True)
             if times:
                 self._put_timestamps(chopper.tdc, times)
 
