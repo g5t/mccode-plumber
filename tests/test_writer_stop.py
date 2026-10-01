@@ -95,7 +95,8 @@ class OrchestrateTest(unittest.TestCase):
     def run_orchestrate(self, simulate, pool=FakePool(JobState.DONE)):
         calls = []
         instr = SimpleNamespace(name='inst', parameters=())
-        with patch.object(orchestrate, 'start_writer', return_value=('job', pool)), \
+        with patch.object(orchestrate, 'idle_writer_pool', return_value=pool), \
+                patch.object(orchestrate, 'start_writer', return_value=('job', pool)), \
                 patch.object(orchestrate, 'stop_writer',
                              side_effect=lambda *a, **k: calls.append(('stop', k.get('pool')))), \
                 patch.object(orchestrate, 'stop_faking_tdc',
@@ -128,6 +129,57 @@ class OrchestrateTest(unittest.TestCase):
         """start_writer has already told the writer to stop it."""
         calls = self.run_orchestrate(lambda *a, **k: None, pool=None)
         self.assertEqual(calls, ['reset'])
+
+
+class FakeWorkerPool:
+    """Reports workers and jobs as a pool watching the command topic would."""
+
+    def __init__(self, workers, jobs=()):
+        self.workers, self.jobs = workers, list(jobs)
+
+    def list_known_workers(self):
+        return self.workers
+
+    def list_known_jobs(self):
+        return self.jobs
+
+
+def worker(state, service='k2n-1'):
+    from mccode_plumber.file_writer_control.WorkerStatus import WorkerState
+    return SimpleNamespace(service_id=service, state=getattr(WorkerState, state))
+
+
+class IdleWriterTest(unittest.TestCase):
+    """No job is sent unless a writer has said it is idle: a job sent otherwise waits in
+    the pool and is later run, unstoppable, by whichever writer comes free."""
+
+    def check(self, pool, wait=3):
+        clock = Clock()
+        return orchestrate.idle_writer_pool('broker:9092', wait=wait, clock=clock,
+                                            sleep=clock.sleep, make_pool=lambda b: pool)
+
+    def test_an_idle_writer_is_used(self):
+        pool = FakeWorkerPool([worker('WRITING', 'a'), worker('IDLE', 'b')])
+        self.assertIs(self.check(pool), pool)
+
+    def test_no_writer_at_all_says_to_start_the_services(self):
+        with self.assertRaises(orchestrate.WriterUnavailable) as raised:
+            self.check(FakeWorkerPool([]))
+        self.assertIn('mp-nexus-services', str(raised.exception))
+
+    def test_a_busy_writer_names_the_job_and_how_to_kill_it(self):
+        job = SimpleNamespace(job_id='job-9', file_name='old.h5', service_id='k2n-1',
+                              state=JobState.WRITING)
+        with self.assertRaises(orchestrate.WriterUnavailable) as raised:
+            self.check(FakeWorkerPool([worker('WRITING')], [job]))
+        text = str(raised.exception)
+        self.assertIn('job-9', text)
+        self.assertIn('mp-writer-kill -b broker:9092 --topic WriterPool --command '
+                      'WriterCommand k2n-1 job-9', text)
+
+    def test_unavailable_is_a_runtime_error(self):
+        """So a caller already catching RuntimeError keeps doing so."""
+        self.assertTrue(issubclass(orchestrate.WriterUnavailable, RuntimeError))
 
 
 if __name__ == '__main__':
