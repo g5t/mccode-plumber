@@ -24,6 +24,30 @@ class EPICSTestCase(unittest.TestCase):
         self.prefix = f"test{str(uuid4()).replace('-', '')}:"
         self.proc = ctx.Process(target=main_for_tests, args=(instr, self.prefix))
         self.proc.start()
+        self.wait_for_server()
+
+    def wait_for_server(self, timeout=60.0):
+        """Wait until the mailbox answers, as tests/test_conductor.py does.
+
+        A spawned process re-imports everything and parses the instrument before it
+        serves a single PV, which on a slow runner (macOS in CI) takes longer than a
+        `get`'s own 5 s timeout. Testing against a server that has not started yet tests
+        nothing about the server.
+        """
+        import time
+        from p4p.client.thread import Context
+        first = f"{self.prefix}{self.pars[0].name}"
+        ctx = Context('pva')
+        try:
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                if not isinstance(ctx.get(first, timeout=1.0, throw=False), Exception):
+                    return
+                if not self.proc.is_alive():
+                    self.fail(f'the mailbox server exited with code {self.proc.exitcode}')
+            self.fail(f'the mailbox server did not answer within {timeout:.0f} s')
+        finally:
+            ctx.close()
 
     def tearDown(self):
         self.proc.terminate()

@@ -82,40 +82,164 @@ def augment_structure(
     return data
 
 
-def stop_writer(broker, job_id, timeout):
-    from time import sleep
-    from datetime import timedelta
-    from mccode_plumber.file_writer_control import WorkerJobPool
-    from mccode_plumber.file_writer_control.JobStatus import JobState
-    # The process is now told to switch to a 'control' topic, that is job-specific
-    # So we should send the stop-command there. This is the 'command_topic_url'?
-    def back_stop(job_topic, command_topic):
-        job_topic_url = f"{broker}/{job_topic}"
-        command_topic_url = f"{broker}/{command_topic}"
-        pool = WorkerJobPool(job_topic_url, command_topic_url)
-        sleep(1)
-        pool.try_send_stop_now(None, job_id)
-        state = pool.get_job_state(job_id)
-        give_up = datetime.now() + timedelta(seconds=timeout)
-        while state != JobState.DONE and state != JobState.ERROR and state != JobState.TIMEOUT and datetime.now() < give_up:
-            sleep(1)
-            state = pool.get_job_state(job_id)
-        return state
+#: How long to wait for the file-writer to say a job has finished after it is told to
+#: stop. Closing a large file can keep it silent for well over the 15 s after which the
+#: status tracker reports a job as `TIMEOUT`, so that is not taken as an answer.
+STOP_TIMEOUT = 120.0
 
-    jstate = back_stop(TOPICS['pool'], TOPICS['command'])
-    if jstate != JobState.DONE:
-        print(f'Done trying to stop {job_id} -> {jstate}')
+
+#: The consumer group kafka-to-nexus takes jobs from the job-pool topic with. Fixed in
+#: kafka-to-nexus (`Command::JobListener::ConsumerGroupId`) for the pool to work at all.
+WRITER_POOL_GROUP = 'kafka-to-nexus-worker-pool'
+
+#: How long to wait for a free file-writer before refusing to submit a job. Writers
+#: publish their status every 2 s.
+IDLE_WAIT = 10.0
+
+
+class WriterUnavailable(RuntimeError):
+    """No file-writer is free to take a job."""
+
+
+def _writer_pool(broker):
+    """A pool watching the file-writers' command topic from now on."""
+    from mccode_plumber.file_writer_control import WorkerJobPool
+    return WorkerJobPool(f"{broker}/{TOPICS['pool']}", f"{broker}/{TOPICS['command']}")
+
+
+def idle_writer_pool(broker, wait: float = IDLE_WAIT, clock=None, sleep=None,
+                     make_pool=None):
+    """A pool with a free file-writer behind it, or `WriterUnavailable` saying why not.
+
+    A job sent to the pool when no writer is free is not refused: it waits there. The
+    start then times out, and its stop goes to writers that do not have it -- but the
+    job is still queued, and the next writer to come free runs it, with no stop time,
+    until somebody kills it. Every job sent meanwhile queues behind it. So no job is sent
+    unless a writer has said it is idle.
+    """
+    from datetime import datetime, timedelta
+    from time import sleep as _sleep
+    from mccode_plumber.file_writer_control.JobStatus import JobState
+    from mccode_plumber.file_writer_control.WorkerStatus import WorkerState
+    clock = clock or datetime.now
+    sleep = sleep or _sleep
+    pool = (make_pool or _writer_pool)(broker)
+    give_up = clock() + timedelta(seconds=wait)
+    while True:
+        workers = pool.list_known_workers()
+        if any(worker.state == WorkerState.IDLE for worker in workers):
+            return pool
+        if clock() >= give_up:
+            break
+        sleep(0.5)
+    if not workers:
+        raise WriterUnavailable(
+            f'No file-writer has reported its status in {wait:.0f} s. Is mp-nexus-services '
+            f'running, with its kafka-to-nexus, against {broker}?')
+    busy = [job for job in pool.list_known_jobs() if job.state == JobState.WRITING]
+    lines = [f'{worker.service_id}: {worker.state.name}' for worker in workers]
+    lines += [f'job {job.job_id} ({job.file_name}) -- stop it with: mp-writer-kill '
+              f'-b {broker} --topic {TOPICS["pool"]} --command {TOPICS["command"]} '
+              f'{job.service_id} {job.job_id}' for job in busy]
+    raise WriterUnavailable('No file-writer is free, so no job was sent:\n  '
+                            + '\n  '.join(lines))
+
+
+def skip_writer_pool_backlog(broker, topic: str | None = None,
+                             group: str = WRITER_POOL_GROUP) -> int:
+    """Move the writers' job-pool position past every job already queued; return how many.
+
+    A writer that is busy leaves the pool, and when it comes back it takes the jobs that
+    arrived meanwhile -- jobs whose senders gave up on them long ago and will never stop
+    them. Done before kafka-to-nexus starts, so no writer is in the group and the position
+    can be set from outside it. Nothing is deleted: the jobs are just behind the writers.
+    """
+    from kafka import KafkaConsumer, TopicPartition
+    from kafka.structs import OffsetAndMetadata
+    topic = topic or TOPICS['pool']
+    consumer = KafkaConsumer(bootstrap_servers=broker, group_id=group,
+                             enable_auto_commit=False)
+    try:
+        partitions = consumer.partitions_for_topic(topic)
+        if not partitions:
+            return 0
+        tps = [TopicPartition(topic, p) for p in partitions]
+        ends = consumer.end_offsets(tps)
+        skipped = 0
+        for tp in tps:
+            committed = consumer.committed(tp)
+            if committed is not None:
+                skipped += max(0, ends[tp] - committed)
+        consumer.commit({tp: OffsetAndMetadata(ends[tp], None, -1) for tp in tps})
+        return skipped
+    finally:
+        consumer.close()
+
+
+def wait_for_job_end(pool, job_id, timeout: float, clock=None, sleep=None):
+    """Wait for the file-writer to report ``job_id`` finished, and return its last state.
+
+    Only `DONE` and `ERROR` end the wait. `TIMEOUT` is what the status tracker calls a
+    job it has heard nothing about for 15 s -- which is what a file-writer busy closing a
+    large file looks like -- so it is waited through, until ``timeout`` seconds pass.
+    """
+    from datetime import datetime, timedelta
+    from time import sleep as _sleep
+    from mccode_plumber.file_writer_control.JobStatus import JobState
+    clock = clock or datetime.now
+    sleep = sleep or _sleep
+    give_up = clock() + timedelta(seconds=timeout)
+    state = pool.get_job_state(job_id)
+    while state not in (JobState.DONE, JobState.ERROR) and clock() < give_up:
+        sleep(1)
+        state = pool.get_job_state(job_id)
+    return state
+
+
+def stop_writer(broker, job_id, timeout=STOP_TIMEOUT, pool=None):
+    """Tell the file-writer to stop ``job_id``, and wait until it says it has.
+
+    Pass the ``pool`` the job was started with. It has been following the command topic
+    since then, so it knows the job and cannot miss the writer's answer -- which arrives
+    within milliseconds of the stop. A pool made here only starts listening now, and if
+    it is not listening yet when the answer comes, the job is never seen to finish.
+    """
+    from time import sleep
+    from mccode_plumber.file_writer_control.JobStatus import JobState
+    if pool is None:
+        pool = _writer_pool(broker)
+        sleep(1)  # give its consumer a chance to be listening before the answer comes
+    pool.try_send_stop_now(None, job_id)
+    state = wait_for_job_end(pool, job_id, timeout)
+    if state == JobState.DONE:
+        return state
+    if state == JobState.ERROR:
+        status = pool.get_job_status(job_id)
+        print(f'The file-writer reported an error for job {job_id}: '
+              f'{status.message if status else "(no message)"}')
+    else:
+        print(f'The file-writer has not said that job {job_id} finished, {timeout:.0f} s '
+              f'after it was told to stop (last known state: {state.name}). It may still '
+              f'be closing the file, or be stuck: `mp-writer-list` shows its jobs, and '
+              f'`mp-writer-kill {job_id}` stops this one.')
+    return state
 
 
 def start_writer(start_time: datetime,
                  structure: dict,
                  filename: Path,
                  broker: str,
-                 timeout: float):
+                 timeout: float,
+                 pool=None):
+    """Start a file-writer job, returning its id and the pool that started it.
+
+    ``pool`` is the pool `idle_writer_pool` found a free writer through. The returned pool
+    is `None` if the job did not start; it has already been told to stop, in case the
+    writer took it up after giving up on it.
+    """
     from uuid import uuid1
     from mccode_plumber.writer import writer_start
     job_id = str(uuid1())
-    success = False
     name = filename.name
     try:
         print(f"Starting {job_id} from {start_time} for file {name} under kafka-to-nexus' working directory")
@@ -124,17 +248,16 @@ def start_writer(start_time: datetime,
             stop_time_string=None,
             broker=broker, job_topic=TOPICS['pool'], command_topic=TOPICS['command'],
             control_topic=TOPICS['command'], # don't switch topics
-            timeout=timeout, job_id=job_id, wait=False
+            timeout=timeout, job_id=job_id, wait=False, pool=pool,
         )
-        # success = start.is_done() # this causes an infinite hang?
-        success = True
+        return job_id, handler.worker_finder
     except RuntimeError as e:
-        if job_id in str(e):
-            # starting the job failed, so try to kill it
-            print(f"Starting {job_id} failed! Error: {e}")
-            stop_writer(broker, job_id, timeout)
-
-    return job_id, success
+        if job_id not in str(e):
+            raise
+        # starting the job failed, so try to kill it
+        print(f"Starting {job_id} failed! Error: {e}")
+        stop_writer(broker, job_id, timeout, pool=pool)
+        return job_id, None
 
 
 class Stream(NamedTuple):
@@ -614,6 +737,12 @@ def load_in_wait_load_out(
 
         # Start up services if they should be managed locally
         if manage:
+            # Before kafka-to-nexus starts: jobs left in the pool by earlier runs would
+            # otherwise be taken up by it, with no stop time and nobody to stop them.
+            skipped = skip_writer_pool_backlog(broker)
+            if skipped:
+                print(f'Skipped {skipped} file-writer job(s) left queued in '
+                      f'{TOPICS["pool"]} by earlier runs')
             if efu is None:
                 data = {
                     'name': instr_name,
@@ -806,7 +935,11 @@ def main():
     # which now also carries things that were never argparse attributes.
     for k in ('nexus_file', 'structure_out', 'broker', 'structure'):
         delattr(args, k)
-    orchestrate(instr, structure, broker, splitrun_kwargs, **kwargs)
+    try:
+        orchestrate(instr, structure, broker, splitrun_kwargs, **kwargs)
+    except WriterUnavailable as error:
+        print(error)
+        raise SystemExit(1)
 
 
 def stop_faking_tdc(choppers) -> None:
@@ -842,6 +975,9 @@ def orchestrate(
     from mccode_plumber.forwarder import (
         forwarder_partial_streams, configure_forwarder, reset_forwarder
     )
+    # Before anything else: a job sent with no free writer waits in the pool and is run,
+    # unstoppable, by the next writer to come free.
+    pool = idle_writer_pool(broker)
     now = datetime.now(timezone.utc)
     title = f'{instr.name} simulation {now}: {splitrun_kwargs["args"]}'
     # kafka-to-nexus will strip off the root part of this path and put the remaining
@@ -865,19 +1001,25 @@ def orchestrate(
         with open(structure_out, 'w') as f:
             dump(structure, f)
 
-    job_id, success = start_writer(now, structure, filename, broker, 30.0)
-    if success:
-        print("Writer job started -- start the simulation")
-        # Do the actual simulation, calling into restage.splitrun after parsing,
-        # Using the provided callbacks to send monitor data to Kafka
-        splitrun_args(instr, **splitrun_kwargs)
-        print("Splitrun simulation finished -- informing file-writer to stop")
-        # Before the writer stops, so the last crossings are still inside the job.
-        stop_faking_tdc(choppers)
-    # Wait for the file-writer to finish its job (possibly kill it)
-    stop_writer(broker, job_id, 20.0)
-    # De-register the forwarder topics
-    reset_forwarder(partial_streams, forwarder_config, PREFIX, TOPICS['parameter'])
+    job_id, pool = start_writer(now, structure, filename, broker, 30.0, pool=pool)
+    try:
+        if pool is not None:
+            print("Writer job started -- start the simulation")
+            # Do the actual simulation, calling into restage.splitrun after parsing,
+            # Using the provided callbacks to send monitor data to Kafka
+            splitrun_args(instr, **splitrun_kwargs)
+            print("Splitrun simulation finished -- informing file-writer to stop")
+    finally:
+        # Whether the simulation finished or failed. A job left running keeps the
+        # writer busy, and the next run's job then times out waiting to start.
+        if pool is not None:
+            # Before the writer stops, so the last crossings are still inside the job.
+            stop_faking_tdc(choppers)
+            # Wait for the file-writer to finish its job, through the pool that started
+            # it; a job that failed to start has already been told to stop
+            stop_writer(broker, job_id, pool=pool)
+        # De-register the forwarder topics
+        reset_forwarder(partial_streams, forwarder_config, PREFIX, TOPICS['parameter'])
     # Verify that the file has been written?
     # This only works if the filewriter was stared in the same directory :(
     # ensure_readable_file(filename)

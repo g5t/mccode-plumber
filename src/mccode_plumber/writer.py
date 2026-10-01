@@ -287,7 +287,13 @@ def writer_start(
         timeout,
         wait,
         job_id,
+        pool=None,
 ):
+    """Start a file-writer job; ``pool`` is a `WorkerJobPool` to start it through.
+
+    Without one, a pool is made here. A caller that has already checked a writer is free
+    passes the pool it checked with, which has been following the writers' status since.
+    """
     from json import dumps
     from time import sleep
     from datetime import datetime, timedelta
@@ -297,7 +303,8 @@ def writer_start(
     if filename is None:
         filename = f'{start_time:%Y%m%d_%H%M%S}.nxs'
 
-    pool = get_writer_pool(broker=broker, job=job_topic, command=command_topic)
+    if pool is None:
+        pool = get_writer_pool(broker=broker, job=job_topic, command=command_topic)
     handler_opts = {'worker_finder': pool}
 
     handler = JobHandler(**handler_opts)
