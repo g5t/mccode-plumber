@@ -7,6 +7,8 @@ busy, and the next run's job times out waiting to start.
 """
 import unittest
 from datetime import datetime, timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -106,11 +108,14 @@ class OrchestrateTest(unittest.TestCase):
                 patch('mccode_plumber.forwarder.reset_forwarder',
                       side_effect=lambda *a, **k: calls.append('reset')), \
                 patch('restage.splitrun.splitrun_args', side_effect=simulate):
-            try:
-                orchestrate.orchestrate(instr, {}, 'broker', {'args': None},
-                                        nexus_file='/tmp/orchestrate-test-never-written.h5')
-            except RuntimeError:
-                calls.append('raised')
+            # A directory that exists on every platform; nothing is ever written there,
+            # since the writer is faked.
+            with TemporaryDirectory() as directory:
+                try:
+                    orchestrate.orchestrate(instr, {}, 'broker', {'args': None},
+                                            nexus_file=str(Path(directory) / 'never.h5'))
+                except RuntimeError:
+                    calls.append('raised')
         return calls
 
     def test_a_finished_simulation_stops_its_job(self):
