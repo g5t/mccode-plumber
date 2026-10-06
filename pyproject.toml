@@ -14,7 +14,7 @@ dependencies = [
     'moreniius>=0.10.1',
     'icecream',
     'ephemeral-port-reserve',
-    "mccode-antlr>=0.28.0",
+    "mccode-antlr>=0.32.0",
     'textual>=8.2.8',
 ]
 readme = "README.md"
