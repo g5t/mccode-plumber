@@ -180,6 +180,7 @@ def main():
     from mccode_plumber.mccode import get_mcstas_instr
     from mccode_plumber.splitrun import (
         parameter_pvs_callback_with_arguments, monitors_to_kafka_callback_for_topics,
+        require_chopper_parameters,
     )
     from mccode_plumber.manage.orchestrate import (
         PREFIX, RUN_PV, WriterUnavailable, get_chopper_specs, get_pulse_stream,
@@ -195,8 +196,12 @@ def main():
     if not isinstance(structure, dict) or not isinstance(structure.get('children'), list):
         raise SystemExit(f'{args.structure or "The default structure"} is not a NeXus '
                          f'structure; name one with --structure')
+    # Before simulating: crossings computed from a parameter that is not there would
+    # only be wrong in the file, long after the simulation that could not record it.
+    choppers = get_chopper_specs(structure)
+    require_chopper_parameters(instr, [c for c, _ in choppers])
     broker = args.broker or 'localhost:9092'
-    replay ={name: getattr(args, name) for name in REPLAY_ARGUMENTS}
+    replay = {name: getattr(args, name) for name in REPLAY_ARGUMENTS}
     config = replay_config(args)
     nexus_file, structure_out = args.nexus_file, args.structure_out
     for name in ('nexus_file', 'structure_out', 'broker', 'structure') + REPLAY_ARGUMENTS:
@@ -221,7 +226,6 @@ def main():
     register_topics(broker, topics)
     send_monitors, _ = monitors_to_kafka_callback_for_topics(
         broker=broker, sources=monitor_sources, delete_after_sending=False)
-    choppers = get_chopper_specs(structure)
     simulated_logs = get_simulated_logs(structure, [c for c, _ in choppers])
     set_point, _ = parameter_pvs_callback_with_arguments(
         instr, [c for c, _ in choppers], RUN_PV, logs=simulated_logs, prefix=PREFIX)

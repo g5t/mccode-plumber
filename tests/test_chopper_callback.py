@@ -111,3 +111,35 @@ class CallbackTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RequireChopperParametersTest(unittest.TestCase):
+    """A disc's speed and delay must be instrument parameters, or its crossings are wrong."""
+
+    def test_a_disc_with_both_is_accepted(self):
+        from mccode_plumber.splitrun import require_chopper_parameters
+        instr = _FakeInstr(_FakeParameter('PSC1Speed', 14), _FakeParameter('psc1delay', 0))
+        require_chopper_parameters(instr, [DISC])
+
+    def test_a_missing_speed_or_delay_is_refused_by_name(self):
+        from mccode_plumber.splitrun import (
+            MissingChopperParameter, require_chopper_parameters,
+        )
+        instr = _FakeInstr(_FakeParameter('psc1speed', 14))
+        with self.assertRaises(MissingChopperParameter) as raised:
+            require_chopper_parameters(instr, [DISC])
+        self.assertIn('psc1 delay (psc1delay)', str(raised.exception))
+        self.assertNotIn('speed', str(raised.exception).split('none for:')[1])
+
+    def test_the_parameter_behind_a_facility_pv_is_what_is_checked(self):
+        from mccode_plumber.splitrun import require_chopper_parameters
+        disc = Chopper(name='psc1', tdc='X:00-TS-I', speed='X:Spd_R', delay='X:TotDly',
+                       speed_parameter='psc1speed', delay_parameter='psc1delay')
+        require_chopper_parameters(
+            _FakeInstr(_FakeParameter('psc1speed', 14), _FakeParameter('psc1delay', 0)),
+            [disc])
+
+    def test_a_missing_park_angle_is_only_warned_about(self):
+        from mccode_plumber.splitrun import require_chopper_parameters
+        instr = _FakeInstr(_FakeParameter('psc1speed', 14), _FakeParameter('psc1delay', 0))
+        require_chopper_parameters(instr, [DISC])  # DISC parks on 'psc1park', not declared
