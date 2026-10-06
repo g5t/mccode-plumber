@@ -98,4 +98,7 @@ def test_the_parser_takes_splitrun_and_replay_arguments():
         'bifrost.instr.json', '-n', '1M', '--counting-time', '2', '--no-fold-tof',
         '--efu-port', '9001', 'sample_rotation=0:10'])
     assert args.counting_time == 2.0 and args.no_fold_tof and args.efu_port == 9001
+    assert args.pulses_per_point == 0
+    assert make_parser().parse_args(
+        ['bifrost.instr.json', '--pulses-per-point', '14']).pulses_per_point == 14
     assert all(hasattr(args, name) for name in REPLAY_ARGUMENTS)

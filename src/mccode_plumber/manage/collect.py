@@ -155,6 +155,11 @@ def make_parser():
       help='EFU address for a detector type the sender configuration does not name')
     a('--efu-port', type=int, default=9000,
       help='EFU UDP port for a detector type the sender configuration does not name')
+    a('--pulses-per-point', type=int, default=0, metavar='PULSES',
+      help="Spread each point's events over PULSES source pulses, so an EFU summing that "
+           'many pulses into a histogram -- a beam monitor, 14 at ESS -- publishes one per '
+           'point; each point then takes PULSES / 14 s to replay (needs '
+           'mcstas-readout-master with paced replay)')
     a('--settle', type=float, default=5.0, metavar='SECONDS',
       help='How long to keep the file open after the replay, for the events the EFUs '
            'are still producing (default 5)')
@@ -162,16 +167,19 @@ def make_parser():
 
 
 REPLAY_ARGUMENTS = ('collector', 'counting_time', 'replay_seed', 'random_order',
-                    'no_fold_tof', 'efu_senders', 'efu_address', 'efu_port', 'settle')
+                    'no_fold_tof', 'efu_senders', 'efu_address', 'efu_port',
+                    'pulses_per_point', 'settle')
 
 
 def replay_config(args):
     import mcstas_readout as ro
     senders = Path(args.efu_senders).read_text() if args.efu_senders else None
+    # only when asked for, so an older mcstas_readout without it still replays unpaced
+    paced = {'pulses_per_point': args.pulses_per_point} if args.pulses_per_point else {}
     return ro.ReplayConfig(counting_time=args.counting_time, seed=args.replay_seed,
                            random_order=args.random_order, senders_json=senders,
                            default_address=args.efu_address, default_port=args.efu_port,
-                           fold_tof=not args.no_fold_tof)
+                           fold_tof=not args.no_fold_tof, **paced)
 
 
 def main():
