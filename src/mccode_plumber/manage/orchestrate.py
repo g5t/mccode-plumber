@@ -853,6 +853,29 @@ def load_in_wait_load_out(
             service.stop()
 
 
+def monitor_sources_and_topics(structure, instr) -> tuple[dict[str, list[str]], list[str]]:
+    """Which monitors publish on which topic, and every topic the structure names.
+
+    Where each monitor publishes comes from the structure's own da00 directives, not
+    from rebuilding a topic name out of the instrument name. Reconstructing it meant
+    holding the same naming convention in two repositories, and disagreeing with it
+    produced no error -- just an empty name list, and monitor data nobody received.
+    Reading the directives also means several monitor topics work as written.
+    """
+    streams = get_stream_modules(structure)
+    monitor_sources = sources_by_topic(streams_of_module(streams, MONITOR_MODULES))
+    topics = topics_of(streams)  # ensure all topics are known to Kafka
+    if not monitor_sources:
+        # No da00 directive to read: keep sending every histogram to the topic this
+        # has always derived, rather than sending nothing at all. A structure that
+        # predates monitor streams still gets its monitors published.
+        monitor_topic = f'{instr.name}_beam_monitor'
+        monitor_sources = {monitor_topic: []}
+        if monitor_topic not in topics:
+            topics.append(monitor_topic)
+    return monitor_sources, topics
+
+
 def make_splitrun_nexus_parser():
     from mccode_plumber import __version__
     from restage.splitrun import make_splitrun_parser
@@ -882,24 +905,7 @@ def main():
 
     structure = load_file_json(args.structure if args.structure else Path(args.instrument).with_suffix('.json'))
 
-    streams = get_stream_modules(structure)
-    # Where each monitor publishes comes from the structure's own da00 directives, not
-    # from rebuilding a topic name out of the instrument name. Reconstructing it meant
-    # holding the same naming convention in two repositories, and disagreeing with it
-    # produced no error -- just an empty name list, and monitor data nobody received.
-    # Reading the directives also means several monitor topics work as written.
-    monitor_sources = sources_by_topic(streams_of_module(streams, MONITOR_MODULES))
-    topics = topics_of(streams)  # ensure all topics are known to Kafka
-
-    if not monitor_sources:
-        # No da00 directive to read: keep sending every histogram to the topic this
-        # has always derived, rather than sending nothing at all. A structure that
-        # predates monitor streams still gets its monitors published.
-        monitor_topic = f'{instr.name}_beam_monitor'
-        monitor_sources = {monitor_topic: []}
-        if monitor_topic not in topics:
-            topics.append(monitor_topic)
-
+    monitor_sources, topics = monitor_sources_and_topics(structure, instr)
     broker = args.broker or 'localhost:9092'
     register_topics(broker, topics)
 
@@ -969,7 +975,15 @@ def orchestrate(
         choppers: list | None = None,
         pulse: tuple[str, str] | None = None,
         simulated_logs: list[SimulatedLog] | None = None,
+        run=None,
+        description: str | None = None,
 ):
+    """Hold a file-writer job and the forwarder open around one run.
+
+    The run is ``restage.splitrun`` with ``splitrun_kwargs``, unless ``run`` is given: then
+    it is called with no arguments instead, and ``description`` stands in for the
+    splitrun arguments in the file's title.
+    """
     from datetime import datetime, timezone
     from restage.splitrun import splitrun_args
     from mccode_plumber.forwarder import (
@@ -979,7 +993,7 @@ def orchestrate(
     # unstoppable, by the next writer to come free.
     pool = idle_writer_pool(broker)
     now = datetime.now(timezone.utc)
-    title = f'{instr.name} simulation {now}: {splitrun_kwargs["args"]}'
+    title = f'{instr.name} simulation {now}: {description or splitrun_kwargs["args"]}'
     # kafka-to-nexus will strip off the root part of this path and put the remaining
     # location and filename under _its_ working directory.
     # Since it doesn't seem to create missing folders, we need to ensure we only
@@ -1004,11 +1018,16 @@ def orchestrate(
     job_id, pool = start_writer(now, structure, filename, broker, 30.0, pool=pool)
     try:
         if pool is not None:
-            print("Writer job started -- start the simulation")
-            # Do the actual simulation, calling into restage.splitrun after parsing,
-            # Using the provided callbacks to send monitor data to Kafka
-            splitrun_args(instr, **splitrun_kwargs)
-            print("Splitrun simulation finished -- informing file-writer to stop")
+            if run is not None:
+                print("Writer job started -- starting the run")
+                run()
+                print("Run finished -- informing file-writer to stop")
+            else:
+                print("Writer job started -- start the simulation")
+                # Do the actual simulation, calling into restage.splitrun after parsing,
+                # Using the provided callbacks to send monitor data to Kafka
+                splitrun_args(instr, **splitrun_kwargs)
+                print("Splitrun simulation finished -- informing file-writer to stop")
     finally:
         # Whether the simulation finished or failed. A job left running keeps the
         # writer busy, and the next run's job then times out waiting to start.
