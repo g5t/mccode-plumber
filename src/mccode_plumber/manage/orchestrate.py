@@ -899,6 +899,7 @@ def main():
     from mccode_plumber.splitrun import (
         parameter_pvs_callback_with_arguments,
         monitors_to_kafka_callback_for_topics,
+        require_chopper_parameters,
     )
     args, parameters, precision = parse_splitrun(make_splitrun_nexus_parser())
     instr = get_mcstas_instr(args.instrument)
@@ -920,6 +921,7 @@ def main():
     # The choppers, read from the same structure the file-writer is filling, so the PV
     # names published here are the stream sources it is waiting on.
     chopper_specs = get_chopper_specs(structure)
+    require_chopper_parameters(instr, [c for c, _ in chopper_specs])
     pulse = get_pulse_stream(structure)
     # Every other log the structure says a parameter fills, served by the mailbox under
     # the source it names. Before each point they are put that point's values, as the

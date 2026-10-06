@@ -132,6 +132,31 @@ def _numeric_parameters(instr) -> dict[str, type]:
     return out
 
 
+class MissingChopperParameter(ValueError):
+    """A disc's crossings would follow from a parameter the instrument does not have."""
+
+
+def require_chopper_parameters(instr, choppers) -> None:
+    """Refuse a disc whose speed or delay is not an instrument parameter.
+
+    A disc's top-dead-centre crossings are computed from its speed and delay, and the
+    only values for them anyone has are the instrument parameters a run sets -- recorded
+    per point in a collector file, put to `mp-tdc`'s inputs before each point. Named in
+    the structure but missing from the instrument, the PV keeps whatever it last held,
+    and every crossing comes out wrong without a word. The park angle is not needed for
+    a crossing, so a missing one is left to the warning the hook gives.
+    """
+    declared = {parameter.name.lower() for parameter in instr.parameters}
+    missing = [f'{chopper.name} {which} ({chopper.parameter(which)})'
+               for chopper in choppers for which in ('speed', 'delay')
+               if getattr(chopper, which)
+               and chopper.parameter(which).lower() not in declared]
+    if missing:
+        raise MissingChopperParameter(
+            'Top-dead-centre times follow from a disc\'s speed and delay, which must be '
+            'instrument parameters; the instrument has none for: ' + ', '.join(missing))
+
+
 def parameter_pvs_callback_with_arguments(instr, choppers, run_pv: str | None,
                                            logs=(), prefix: str | None = None):
     """A *pre*-point hook publishing what the point about to be traced is set to.
