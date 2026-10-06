@@ -86,8 +86,15 @@ def test_several_collector_files_must_be_named(tmp_path):
         choose_collector_file(tmp_path, 'detectors')
 
 
+def parse(argv):
+    """As restage's `parse_splitrun` does: scan parameters are moved ahead of the options
+    first, which argparse before Python 3.12 needs to take them after options."""
+    from mccode_antlr.run.runner import sort_args
+    return make_parser().parse_args(sort_args(argv))
+
+
 def test_the_parser_takes_splitrun_and_replay_arguments():
-    args = make_parser().parse_args([
+    args = parse([
         'bifrost.instr.json', '-n', '1M', '--counting-time', '2', '--no-fold-tof',
         '--efu-port', '9001', 'sample_rotation=0:10'])
     assert args.counting_time == 2.0 and args.no_fold_tof and args.efu_port == 9001
