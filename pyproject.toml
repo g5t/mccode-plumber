@@ -56,6 +56,8 @@ mp-insert-hdf5-instr = 'mccode_plumber.mccode:insert'
 mp-nexus-splitrun = 'mccode_plumber.manage.orchestrate:main'
 mp-nexus-services = 'mccode_plumber.manage.orchestrate:services'
 mp-nexus-collect-replay = 'mccode_plumber.manage.collect:main'
+mp-replay = 'mccode_plumber.manage.replay:replay'
+mp-nexus-replay = 'mccode_plumber.manage.replay:nexus_replay'
 
 [tool.setuptools_scm]
 
