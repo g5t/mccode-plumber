@@ -667,6 +667,19 @@ def efu_parameter(s: str):
     return EventFormationUnitConfig.from_dict(data)
 
 
+#: The options that start services, by attribute name: shared by every command that does
+SERVICES_ARGUMENTS = ('efu', 'writer_working_dir', 'writer_verbosity', 'forwarder_verbosity')
+
+
+def add_services_arguments(parser) -> None:
+    """The options saying which services to start and how, as `mp-nexus-services` takes them."""
+    a = parser.add_argument
+    a('--efu', type=efu_parameter, action='append', default=None, help='Configuration of one EFU, repeatable', metavar='name,calibration,config,port')
+    a('--writer-working-dir', type=str, default=None, help='Working directory for kafka-to-nexus')
+    a('--writer-verbosity', type=str, default=None, help='Verbose output type (trace, debug, warning, error, critical)')
+    a('--forwarder-verbosity', type=str, default=None,  help='Verbose output type (trace, debug, warning, error, critical)')
+
+
 def make_services_parser():
     from mccode_plumber import __version__
     from argparse import ArgumentParser
@@ -676,41 +689,48 @@ def make_services_parser():
     a('-v', '--version', action='version', version=__version__)
     # No need to specify the broker, or monitor source or topic names
     a('-b', '--broker', type=str, default=None, help='Kafka broker for all services', metavar='address:port')
-    a('--efu', type=efu_parameter, action='append', default=None, help='Configuration of one EFU, repeatable', metavar='name,calibration,config,port')
-    a('--writer-working-dir', type=str, default=None, help='Working directory for kafka-to-nexus')
-    a('--writer-verbosity', type=str, default=None, help='Verbose output type (trace, debug, warning, error, critical)')
-    a('--forwarder-verbosity', type=str, default=None,  help='Verbose output type (trace, debug, warning, error, critical)')
+    add_services_arguments(parser)
     a('--structure', type=str, default=None, help='NeXus Structure JSON path, read to find the choppers')
     return parser
 
 
-def services():
-    args = make_services_parser().parse_args()
-    instr_name, instr_parameters = get_instr_name_and_parameters(args.instrument)
-    # The same default `mp-nexus-splitrun` uses, so both processes read one description of
-    # the choppers and cannot disagree about the PV names.
-    structure_path = Path(args.structure or Path(args.instrument).with_suffix('.json'))
+def services_kwargs(instrument, structure_path, broker, efu=None, writer_working_dir=None,
+                    writer_verbosity=None, forwarder_verbosity=None) -> dict:
+    """What `start_services` needs, for ``instrument`` described by ``structure_path``.
+
+    ``structure_path`` defaults, as `mp-nexus-splitrun`'s does, to the instrument file with
+    a ``.json`` suffix, so both read one description of the choppers and cannot disagree
+    about the PV names.
+    """
+    instr_name, instr_parameters = get_instr_name_and_parameters(instrument)
+    structure_path = Path(structure_path or Path(instrument).with_suffix('.json'))
     structure = load_file_json(structure_path) if structure_path.exists() else {}
     streams = get_stream_modules(structure)
     choppers = get_chopper_specs(structure)
-    kwargs = {
+    return {
         'instr_name': instr_name,
         'instr_parameters': instr_parameters,
-        'broker': args.broker or 'localhost:9092',
-        'efu': args.efu,
+        'broker': broker or 'localhost:9092',
+        'efu': efu,
         'choppers': choppers,
         'simulated_logs': get_simulated_logs(structure, [c for c, _ in choppers]),
         'pulse': get_pulse_stream(structure),
-        'work': args.writer_working_dir,
-        'verbosity_writer': args.writer_verbosity,
-        'verbosity_forwarder': args.forwarder_verbosity,
+        'work': writer_working_dir,
+        'verbosity_writer': writer_verbosity,
+        'verbosity_forwarder': forwarder_verbosity,
         'event_topic': event_topic_from_streams(streams),
         'stream_topics': topics_of(streams),
     }
-    load_in_wait_load_out(**kwargs)
 
 
-def load_in_wait_load_out(
+def services():
+    args = make_services_parser().parse_args()
+    load_in_wait_load_out(**services_kwargs(
+        args.instrument, args.structure, args.broker,
+        **{name: getattr(args, name) for name in SERVICES_ARGUMENTS}))
+
+
+def start_services(
         instr_name: str,
         instr_parameters: tuple[InstrumentParameter, ...],
         broker: str,
@@ -724,9 +744,13 @@ def load_in_wait_load_out(
         event_topic: str | None = None,
         stream_topics: list[str] | None = None,
         simulated_logs: list[SimulatedLog] | None = None,
-    ):
-        import signal
-        from time import sleep
+    ) -> tuple:
+        """Start the data-collection services and register their topics.
+
+        Returns the running services, for `stop_services` (or `load_in_wait_load_out`,
+        which keeps them up until interrupted). With ``manage=False`` none are started --
+        they are someone else's -- and only the topics are registered.
+        """
         from colorama import Fore, Back, Style
         from mccode_plumber.manage import (
             EventFormationUnit, EPICSMailbox, Forwarder, KafkaToNexus, TDCFaker
@@ -826,6 +850,48 @@ def load_in_wait_load_out(
         register_topics(broker, list(dict.fromkeys(
             list(TOPICS.values()) + list(stream_topics or ())
         )))
+        return things
+
+
+def stop_services(things) -> None:
+    for service in things:
+        service.stop()
+
+
+def wait_for_services(things, timeout: float = 60.0, sleep=None, clock=None) -> None:
+    """Return once every EFU answers on its command port, or raise.
+
+    An EFU binds its UDP port only once it is set up, and a replay sent before then is
+    lost without a word. Its TCP command port opens at the same time, so that is what is
+    waited for. The file-writer is waited for by the run itself, which needs an idle one.
+    """
+    import socket
+    from time import monotonic, sleep as _sleep
+    from mccode_plumber.manage import EventFormationUnit
+    sleep = sleep or _sleep
+    clock = clock or monotonic
+    deadline = clock() + timeout
+    for service in things:
+        if not isinstance(service, EventFormationUnit):
+            continue
+        while True:
+            if not service.poll():
+                raise RuntimeError(f'{service.name} exited while starting')
+            try:
+                with socket.create_connection(('localhost', service.command), timeout=1):
+                    break
+            except OSError:
+                if clock() > deadline:
+                    raise RuntimeError(f'{service.name} did not start within {timeout:g} s')
+                sleep(0.5)
+
+
+def load_in_wait_load_out(**kwargs):
+        """Start the services and keep them up until interrupted (Ctrl-C), or one exits."""
+        import signal
+        from time import sleep
+        from colorama import Fore, Back, Style
+        things = start_services(**kwargs)
 
         def signal_handler(signum, frame):
             if signum == signal.SIGINT:
@@ -839,7 +905,8 @@ def load_in_wait_load_out(
         signal.signal(signal.SIGINT, signal_handler)
         print(
             Fore.YELLOW+Back.LIGHTGREEN_EX+Style.BRIGHT
-            + "\tYou can now run 'mp-nexus-splitrun' in another process"
+            + "\tYou can now run 'mp-nexus-splitrun', 'mp-nexus-collect-replay' or"
+            + " 'mp-replay' in another process"
             + " (Press CTRL+C to exit)." + Style.RESET_ALL
         )
         # signal.pause()
