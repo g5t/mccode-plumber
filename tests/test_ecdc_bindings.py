@@ -143,9 +143,17 @@ class DelayUnitTest(unittest.TestCase):
 
 class PulseTest(unittest.TestCase):
 
-    def test_the_pulse_is_the_accelerators_current(self):
+    def test_the_pulse_is_the_accelerators_charge(self):
         self.assertEqual(get_pulse_stream(ECDC),
-                         ('mcstas:TD-M:Ctrl-EVR-1:DbufBCurr-I', 'tn_data_general'))
+                         ('mcstas:A2T-130LWU:PBI-BCM-001:PulseChargeR', 'tn_data_general'))
+
+    def test_a_current_log_is_still_read(self):
+        old = {'children': [{'name': 'source', 'type': 'group',
+                             'attributes': [{'name': 'NX_class', 'values': 'NXsource'}],
+                             'children': [{'name': 'current', 'type': 'group',
+                                           'children': [{'module': 'f144', 'config': {
+                                               'source': 'pulse', 'topic': 'choppers'}}]}]}]}
+        self.assertEqual(get_pulse_stream(old), ('pulse', 'choppers'))
 
     def test_the_older_name_is_still_read(self):
         old = {'children': [{'name': 'neutron_prod_info', 'type': 'group',

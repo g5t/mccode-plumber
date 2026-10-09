@@ -494,7 +494,9 @@ def get_chopper_specs(structure) -> list[tuple[Chopper, str]]:
 #: What the per-pulse reference log is called, newest first. ECDC names the accelerator's
 #: NXsource `source` and its proton current log `current`; niess before 0.8 wrote
 #: `neutron_prod_info` and `current_log`.
-PULSE_LOG_NAMES = ('current', 'current_log')
+#: The NXsource log the pulse reference is published to: `pulse_charge` (uC), as ECDC
+#: and niess > 0.9.2 name it; `current` in files from earlier structures.
+PULSE_LOG_NAMES = ('pulse_charge', 'current', 'current_log')
 
 
 def get_pulse_stream(structure) -> tuple[str, str] | None:

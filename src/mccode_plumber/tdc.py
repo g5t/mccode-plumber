@@ -31,9 +31,11 @@ from .conductor import NS, Chopper
 #: turns of a disc fall inside one pulse.
 PULSE_RATE = 14.0
 
-#: What to publish as the per-pulse reference sample. A simulation has no accelerator, so
-#: the value is a stand-in; its *timestamp* is the part everything else is measured from.
-PULSE_VALUE = 1.0
+#: What to publish as the per-pulse reference sample: the proton charge of one pulse, in
+#: uC, which is what a reduction normalizes by. A simulation has no accelerator, so this
+#: is the nominal one McStas's ESS sources assume -- 2 MW of 2 GeV protons is 1 mA, or
+#: 1 mA / 14 Hz a pulse. Its *timestamp* is what everything else is measured from.
+PULSE_VALUE = 1.0e3 / PULSE_RATE
 
 
 def _scalar(value):
