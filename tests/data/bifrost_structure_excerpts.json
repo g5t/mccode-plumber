@@ -39,22 +39,22 @@
           }
          },
          {
-          "name": "current",
+          "name": "pulse_charge",
           "type": "group",
           "children": [
            {
             "module": "f144",
             "config": {
-             "source": "mcstas:TD-M:Ctrl-EVR-1:DbufBCurr-I",
+             "source": "mcstas:A2T-130LWU:PBI-BCM-001:PulseChargeR",
              "topic": "tn_data_general",
              "dtype": "double",
-             "value_units": "mA"
+             "value_units": "uC"
             },
             "attributes": [
              {
               "name": "units",
               "dtype": "string",
-              "values": "mA"
+              "values": "uC"
              }
             ]
            }
@@ -1890,7 +1890,7 @@
           }
          },
          {
-          "name": "current",
+          "name": "pulse_charge",
           "type": "group",
           "children": [
            {
@@ -1899,13 +1899,13 @@
              "source": "pulse",
              "topic": "choppers",
              "dtype": "double",
-             "value_units": "mA"
+             "value_units": "uC"
             },
             "attributes": [
              {
               "name": "units",
               "dtype": "string",
-              "values": "mA"
+              "values": "uC"
              }
             ]
            }
