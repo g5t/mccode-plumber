@@ -71,7 +71,7 @@
           "module": "dataset",
           "config": {
            "name": "depends_on",
-           "values": ".",
+           "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation",
            "dtype": "string"
           }
          }
@@ -335,7 +335,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -666,7 +666,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -894,7 +894,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -1232,7 +1232,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -1570,7 +1570,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -1698,7 +1698,7 @@
            {
             "name": "depends_on",
             "dtype": "string",
-            "values": "."
+            "values": "/entry/instrument/sample_origin/transformations/rotation_y"
            },
            {
             "name": "simulation_parameter",
@@ -1711,7 +1711,7 @@
           "module": "dataset",
           "config": {
            "name": "depends_on",
-           "values": ".",
+           "values": "/entry/instrument/sample_origin/transformations/rotation_y",
            "dtype": "string"
           }
          }
@@ -1772,7 +1772,7 @@
            {
             "name": "depends_on",
             "dtype": "string",
-            "values": "."
+            "values": "/entry/instrument/sample_origin/transformations/rotation_y"
            },
            {
             "name": "simulation_parameter",
@@ -1785,7 +1785,7 @@
           "module": "dataset",
           "config": {
            "name": "depends_on",
-           "values": ".",
+           "values": "/entry/instrument/sample_origin/transformations/rotation_y",
            "dtype": "string"
           }
          }
@@ -1922,7 +1922,7 @@
           "module": "dataset",
           "config": {
            "name": "depends_on",
-           "values": ".",
+           "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation",
            "dtype": "string"
           }
          }
@@ -2186,7 +2186,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -2517,7 +2517,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -2745,7 +2745,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -3083,7 +3083,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -3421,7 +3421,7 @@
              {
               "name": "depends_on",
               "dtype": "string",
-              "values": "."
+              "values": "/entry/instrument/sample_origin/transformations/inverse_sample_origin_translation"
              }
             ]
            },
@@ -3549,7 +3549,7 @@
            {
             "name": "depends_on",
             "dtype": "string",
-            "values": "."
+            "values": "/entry/instrument/sample_origin/transformations/rotation_y"
            },
            {
             "name": "simulation_parameter",
@@ -3562,7 +3562,7 @@
           "module": "dataset",
           "config": {
            "name": "depends_on",
-           "values": ".",
+           "values": "/entry/instrument/sample_origin/transformations/rotation_y",
            "dtype": "string"
           }
          }
@@ -3623,7 +3623,7 @@
            {
             "name": "depends_on",
             "dtype": "string",
-            "values": "."
+            "values": "/entry/instrument/sample_origin/transformations/rotation_y"
            },
            {
             "name": "simulation_parameter",
@@ -3636,7 +3636,7 @@
           "module": "dataset",
           "config": {
            "name": "depends_on",
-           "values": ".",
+           "values": "/entry/instrument/sample_origin/transformations/rotation_y",
            "dtype": "string"
           }
          }

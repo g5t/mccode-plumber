@@ -9,7 +9,7 @@ dependencies = [
     'numpy',
     'kafka-python>=2.2.11,<2.3.0',
     'ess-streaming-data-types>=0.14.0',
-    'restage>=0.14.0',
+    'restage>=0.17.0',
     'mccode-to-kafka>=0.5.0',
     'moreniius>=0.10.1',
     'icecream',
@@ -34,7 +34,7 @@ classifiers = [
 dynamic = ['version']
 
 [project.optional-dependencies]
-test = ["pytest", "niess>=0.8.0"]
+test = ["pytest", "niess>=0.10.1"]
 
 [project.scripts]
 mp-splitrun = 'mccode_plumber.splitrun:main'
@@ -75,7 +75,7 @@ legacy_tox_ini = """
     [testenv]
     deps =
         pytest
-        niess>=0.8.0
+        niess>=0.10.1
     commands = pytest tests
 
     [testenv:type]
