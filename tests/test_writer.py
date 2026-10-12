@@ -2,41 +2,54 @@ import unittest
 
 
 class WriterTestCase(unittest.TestCase):
+    """The structure is given -- plumber extends it with the parameters and a title."""
+
     def setUp(self):
-        from json import dumps
         from mccode_antlr.loader import parse_mcstas_instr
-        from mccode_to_kafka.writer import da00_dataarray_config, da00_variable_config
-        t = da00_variable_config(name='t', label='monitor', unit='usec', axes=['t'], shape=[10], data_type='float64')
-        ns = da00_dataarray_config(topic='monitor', source='mccode-to-kafka', variables=[t])
-        instr = f"""DEFINE INSTRUMENT this_IS_NOT_BIFROST()
+        instr = f"""DEFINE INSTRUMENT with_a_knob(double speed/"Hz"=14)
         TRACE
         COMPONENT origin = Arm() AT (0, 0, 0) ABSOLUTE
         COMPONENT source = Source_simple() AT (0, 0, 1) RELATIVE PREVIOUS
-        COMPONENT monitor = TOF_monitor() AT (0, 0, 1) RELATIVE source
-        METADATA "application/json" "nexus_structure_stream_data" %{{{dumps(ns)}%}}
-        COMPONENT sample = Arm() AT (0, 0, 80) RELATIVE source
         END
         """
         self.instr = parse_mcstas_instr(instr)
+        self.structure = {'children': [{'name': 'entry', 'type': 'group', 'attributes': [
+            {'name': 'NX_class', 'dtype': 'string', 'values': 'NXentry'}], 'children': [
+            {'name': 'instrument', 'type': 'group', 'children': [], 'attributes': [
+                {'name': 'NX_class', 'dtype': 'string', 'values': 'NXinstrument'}]}]}]}
 
-    def test_parse(self):
-        from mccode_plumber.writer import construct_writer_pv_dicts_from_parameters
-        from mccode_plumber.writer import default_nexus_structure
-        from moreniius.path_navigator import NexusStructureNavigator
-        params = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
-        self.assertEqual(len(params), 0)
-        nav = NexusStructureNavigator(default_nexus_structure(self.instr))
-        instrument = nav['/entry/instrument']
-        self.assertTrue(all(instrument.exists(x) for x in ('origin', 'source', 'monitor')))
+    def define(self, **sources):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from mccode_antlr.io.json import save_json
+        from mccode_plumber.writer import (construct_writer_pv_dicts_from_parameters,
+                                           make_define_nexus_structure)
+        pvs = construct_writer_pv_dicts_from_parameters(self.instr.parameters, 'mcstas:', 'topic')
+        with TemporaryDirectory() as tmp:
+            instr = Path(tmp) / 'with_a_knob.instr.json'
+            save_json(self.instr, instr)
+            return make_define_nexus_structure()(instr, pvs, title='a title', **sources)
 
-        data = instrument['monitor/data'].structure
-        idx = [i for i, ch in enumerate(data['children']) if 'module' in ch and 'da00' == ch['module']]
-        self.assertEqual(len(idx), 1)
-        da00 = data['children'][idx[0]]
-        self.assertEqual(len(da00.keys()), 2)
-        self.assertEqual(da00['module'], 'da00')
-        self.assertEqual(da00['config']['topic'], 'monitor')
-        self.assertEqual(da00['config']['source'], 'mccode-to-kafka')
+    def test_a_given_structure_is_extended(self):
+        from json import dump
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        with TemporaryDirectory() as tmp:
+            file = Path(tmp) / 'structure.json'
+            with open(file, 'w') as f:
+                dump(self.structure, f)
+            structure = self.define(file=file)
+        entry = structure['children'][0]
+        names = [c.get('name') or c.get('config', {}).get('name') for c in entry['children']]
+        self.assertIn('instrument', names)
+        self.assertIn('title', names)
+        parameters = next(c for c in entry['children'] if c.get('name') == 'parameters')
+        self.assertEqual([c['name'] for c in parameters['children']], ['speed'])
+
+    def test_no_structure_is_an_error(self):
+        """Not one invented from the instrument: that was moreniius's job, and it is gone."""
+        with self.assertRaisesRegex(ValueError, 'No NeXus structure given'):
+            self.define()
 
 
 class WriterUnitsTestCase(unittest.TestCase):
