@@ -163,16 +163,6 @@ def a_log_as_of_20230626(ch: dict):
     return dict(name=ch['name'], type='group', attributes=[attrs], children=[log_child, desc_child])
 
 
-def default_nexus_structure(instr, origin: str | None = None):
-    from zenlog import log
-    import moreniius.additions  # patches the Instance class to have more translation methods
-    from moreniius import MorEniius
-    log.info('Creating NeXus structure from instrument'
-             ' -- no custom Instance to NeXus mapping is used'
-             ' -- provide a JSON object, a python module and function name, or executable to use a custom mapping')
-    return MorEniius.from_mccode(instr, origin=origin, only_nx=False, absolute_depends_on=True).to_nexus_structure()
-
-
 def add_pvs_to_nexus_structure(ns: dict, pvs: list[dict]):
     if 'children' not in ns:
         raise RuntimeError('Top-level NeXus structure dict with toplevel list entry named "children" expected.')
@@ -251,8 +241,7 @@ def make_define_nexus_structure():
             event_stream: dict[str, str] | None = None,
             file: Path | None = None,
             func: Callable[[Instr], dict] | None = None,
-            binary: Path | None = None,
-            origin: str | None = None):
+            binary: Path | None = None):
         import json
         from .mccode import get_mcstas_instr
         if file is not None and file.exists():
@@ -267,7 +256,11 @@ def make_define_nexus_structure():
                 raise RuntimeError(f"Failed to execute {binary} {instr} due to error {result.stderr.decode()}")
             nexus_structure = json.loads(result.stdout.decode())
         else:
-            nexus_structure = default_nexus_structure(get_mcstas_instr(instr), origin=origin)
+            # plumber extends a structure; it does not invent one from a McStas instrument
+            raise ValueError('No NeXus structure given: provide a JSON file (--ns-file), a '
+                             'python module:function (--ns-func) or an executable '
+                             '(--ns-exec) -- e.g. the JSON niess.nexus.to_nexus_structure '
+                             'writes for the instrument')
         nexus_structure = add_pvs_to_nexus_structure(nexus_structure, pvs)
         nexus_structure = add_title_to_nexus_structure(nexus_structure, title or 'Unknown title')
         # nexus_structure = insert_events_in_nexus_structure(nexus_structure, event_stream)
@@ -390,7 +383,6 @@ def get_arg_parser():
     a('--ns-save', type=is_writable, default=None, help='Path at which to save (overwrite) extended NeXus structure')
     a('--start-time', type=str)
     a('--stop-time',  type=str, default=None)
-    a('--origin', type=str, default=None, help='component name used for the origin of the NeXus file')
     a('--wait', action='store_true', help='If provided, wait for the writer to finish before exiting')
     a('--time-out', type=float, default=120., help='Wait up to the timeout for writing to start')
     a('--job-id', type=str, default=None, help='Unique Job identifier for this write-job')
@@ -433,7 +425,7 @@ def parse_writer_args():
     params = construct_writer_pv_dicts(args.instrument, args.prefix, args.topic)
     define_nexus_structure = make_define_nexus_structure()
     structure = define_nexus_structure(
-        args.instrument, params, title=args.title, origin=args.origin,
+        args.instrument, params, title=args.title,
         file=args.ns_file, func=args.ns_func, binary=args.ns_exec,
         event_stream={'source': args.event_source, 'topic': args.event_topic}
     )
