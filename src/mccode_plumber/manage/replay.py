@@ -11,6 +11,11 @@ does exactly that. Getting the events into a NeXus file is then a separate step:
 
 `mp-nexus-collect-replay` does the simulation and `mp-replay`'s part in one go.
 
+Either command given a scan *directory* instead of a file follows the scan: restage
+writes each point's whole collector files to ``DIR/<point>/point`` as soon as that point
+is done, and the points are replayed in order as they appear -- while later points are
+still being simulated, on this machine or on any other that shares the filesystem.
+
 Replaying steps through the file's points. Before each point's events are sent, the
 point's parameter values go to the same PVs a simulation's pre-point hook puts them on --
 the mailbox, the choppers' inputs to `mp-tdc`, and the simulated logs -- and any McStas
@@ -111,6 +116,99 @@ def replay_file(filename, config, publisher, settle: float = 0.0) -> bool:
 
 
 
+class PointTimeout(RuntimeError):
+    """A followed scan point did not appear in time."""
+
+
+def missing_virtual_sources(filename) -> list[str]:
+    """The files `filename`'s virtual datasets read from that are not there.
+
+    A point restage split reads its primary's records from the primary's file in the
+    cache. HDF5 reads a missing source as zeros without complaint, and the replay would
+    send them as events.
+    """
+    import h5py
+    missing = set()
+    with h5py.File(filename, 'r') as file:
+        def visit(_, obj):
+            if isinstance(obj, h5py.Dataset) and obj.is_virtual:
+                missing.update(s.file_name for s in obj.virtual_sources()
+                               if s.file_name != '.' and not Path(s.file_name).exists())
+        file.visititems(visit)
+    return sorted(missing)
+
+
+def is_scan_directory(path) -> bool:
+    """Whether to follow ``path`` as a scan rather than replay it as a file.
+
+    A scan directory need not exist yet -- the follower may well start before the
+    scan does -- so anything that is not a file is one, unless it is named like a
+    collector file: a mistyped file name should fail now, not wait for ever.
+    """
+    path = Path(path)
+    return not path.is_file() and path.suffix != '.h5'
+
+
+def follow_points(directory, timeout: float | None = None, poll: float = 1.0,
+                  sleep=None, clock=None):
+    """Yield ``(point, collector file)`` for each point of a scan, in order, once it is done.
+
+    The scan is restage's: it writes its point count to the manifest before simulating,
+    and renames each point's ``point.part`` directory to ``point`` once that point's
+    files are complete. Points finished out of order wait their turn. ``timeout`` bounds
+    the wait for each one -- a scan that failed leaves no sign but the silence.
+    """
+    import json
+    import time
+    from restage.collectors import POINT_DIRECTORY
+    from restage.splitrun import MANIFEST
+    from mccode_plumber.manage.collect import choose_collector_file
+    sleep = sleep or time.sleep
+    clock = clock or time.monotonic
+    directory = Path(directory)
+
+    def wait_for(path: Path, what: str):
+        start = last = clock()
+        while not path.exists():
+            now = clock()
+            if timeout is not None and now - start > timeout:
+                raise PointTimeout(f'Gave up waiting {timeout:g} s for {what} ({path})')
+            if now - last >= 60:
+                print(f'Still waiting for {what} after {now - start:.0f} s')
+                last = now
+            sleep(poll)
+
+    manifest = directory / MANIFEST
+    wait_for(manifest, 'the scan to start')
+    points = json.loads(manifest.read_text())['points']
+    for point in range(points):
+        ready = directory / str(point) / POINT_DIRECTORY
+        wait_for(ready, f'point {point} of {points}')
+        filename = choose_collector_file(ready)
+        if missing := missing_virtual_sources(filename):
+            raise RuntimeError(f'{filename} reads from files that are not here: '
+                               f'{", ".join(missing)}')
+        yield point, filename
+
+
+def replay_followed(directory, config, publisher_for, settle: float = 0.0,
+                    timeout: float | None = None) -> bool:
+    """Replay each point of the scan in ``directory`` as it is done; see `follow_points`.
+
+    ``publisher_for(point)`` gives the publisher for one point's file: each file holds
+    a single point, which it calls point 0.
+    """
+    from time import sleep
+    for point, filename in follow_points(directory, timeout=timeout):
+        print(f'Replaying point {point} from {filename}')
+        if not replay_file(filename, config, publisher_for(point)):
+            return False
+    if settle > 0:
+        print(f'Replay done -- waiting {settle:g} s for the last events to reach the file')
+        sleep(settle)
+    return True
+
+
 def add_replay_arguments(parser) -> None:
     """How to replay: sampling, timing and where the EFUs are."""
     a = parser.add_argument_group('replay').add_argument
@@ -177,8 +275,11 @@ def point_directories(filename: Path, points: int) -> list[Path]:
 
 
 def replay_into_services(instr, structure, broker: str, filename: Path, config,
-                         settle: float, nexus_file=None, structure_out=None) -> None:
+                         settle: float, nexus_file=None, structure_out=None,
+                         point_timeout: float | None = None) -> None:
     """Replay ``filename`` inside a file-writer job, with the forwarder configured for it.
+
+    A directory is a scan being simulated, followed point by point; see `follow_points`.
 
     The services must be running. What each point sets is what `mp-nexus-splitrun`'s
     pre-point hook would have set for it; see the module docstring.
@@ -192,8 +293,6 @@ def replay_into_services(instr, structure, broker: str, filename: Path, config,
         PREFIX, RUN_PV, WriterUnavailable, get_chopper_specs, get_pulse_stream,
         get_simulated_logs, monitor_sources_and_topics, orchestrate, register_topics,
     )
-    points = ro.validate_collector_file(filename)
-    print(f'Replaying {points} point(s) from {filename}')
     choppers = get_chopper_specs(structure)
     require_chopper_parameters(instr, [c for c, _ in choppers])
     monitor_sources, topics = monitor_sources_and_topics(structure, instr)
@@ -203,14 +302,24 @@ def replay_into_services(instr, structure, broker: str, filename: Path, config,
     simulated_logs = get_simulated_logs(structure, [c for c, _ in choppers])
     set_point, _ = parameter_pvs_callback_with_arguments(
         instr, [c for c, _ in choppers], RUN_PV, logs=simulated_logs, prefix=PREFIX)
-    publisher = PointPublisher(set_point, send_monitors, point_directories(filename, points))
+    if is_scan_directory(filename):
+        print(f'Following the scan in {filename}')
+        run = lambda: replay_followed(  # noqa: E731
+            filename, config, settle=settle, timeout=point_timeout,
+            publisher_for=lambda n: PointPublisher(set_point, send_monitors,
+                                                   [Path(filename) / str(n)]))
+    else:
+        points = ro.validate_collector_file(filename)
+        print(f'Replaying {points} point(s) from {filename}')
+        publisher = PointPublisher(set_point, send_monitors,
+                                   point_directories(filename, points))
+        run = lambda: replay_file(filename, config, publisher, settle)  # noqa: E731
     try:
         orchestrate(instr, structure, broker, {}, nexus_file=nexus_file,
                     structure_out=structure_out, choppers=choppers,
                     pulse=get_pulse_stream(structure), simulated_logs=simulated_logs,
-                    run=lambda: replay_file(filename, config, publisher, settle),
-                    description=f'replay of {filename}')
-    except WriterUnavailable as error:
+                    run=run, description=f'replay of {filename}')
+    except (WriterUnavailable, PointTimeout) as error:
         print(error)
         raise SystemExit(1)
 
@@ -224,7 +333,12 @@ def make_replay_parser(prog: str = 'mp-replay', services: bool = False):
         'Replay a collector file into a NeXus file, through running services'))
     a = parser.add_argument
     a('instrument', type=str, help='The instrument the file was simulated with (.instr.json)')
-    a('collector', type=str, help='The collector file to replay, e.g. DIR/bifrost.h5')
+    a('collector', type=str,
+      help='The collector file to replay, e.g. DIR/bifrost.h5; or a scan directory DIR, '
+           'to replay its points in order as restage finishes them')
+    a('--point-timeout', type=float, default=None, metavar='SECONDS',
+      help='Following a scan directory: how long to wait for each point (default: '
+           'until it appears)')
     a('-v', '--version', action='version', version=__version__)
     a('-b', '--broker', type=str, default=None, metavar='address:port',
       help='Kafka broker for the forwarder and file-writer control')
@@ -248,7 +362,8 @@ def _replay(args) -> None:
     structure = load_structure(args.structure, args.instrument)
     replay_into_services(instr, structure, args.broker or 'localhost:9092',
                          Path(args.collector), replay_config(args), args.settle,
-                         nexus_file=args.nexus_file, structure_out=args.structure_out)
+                         nexus_file=args.nexus_file, structure_out=args.structure_out,
+                         point_timeout=args.point_timeout)
 
 
 def replay():
