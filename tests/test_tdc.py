@@ -282,3 +282,77 @@ class ServerTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+#: A disc whose delay is the total of the ESS controller's three, as niess >= 0.12 writes
+#: it: the delay PV is served, not set, and pulse_delay is one PV every disc shares.
+TOTALLED = Chopper(name='psc1', tdc='psc1_tdc', speed='psc1_rotation_speed',
+                   delay='psc1_delay', park='psc1_park_angle', delay_unit='ns',
+                   experiment='psc1_experiment_delay', mechanical='psc1_mechanical_delay',
+                   pulse='pulse_delay')
+PSC2 = Chopper(name='psc2', tdc='psc2_tdc', speed='psc2_rotation_speed',
+               delay='psc2_delay', delay_unit='ns', experiment='psc2_experiment_delay',
+               mechanical='psc2_mechanical_delay', pulse='pulse_delay')
+
+
+class TotalDelayTest(unittest.TestCase):
+
+    def test_the_total_is_formed_as_the_controller_forms_it(self):
+        """ESS evr_seq_calc: TotDly = MechDly/360/|Spd_S|*1e9 + BeamPosDly + ChopDly."""
+        values = {'psc1_rotation_speed': -14.0, 'psc1_experiment_delay': 2e6,
+                  'psc1_mechanical_delay': 90.0, 'pulse_delay': 1e4}
+        total = 2e6 + 1e4 + 90.0 / 360 / 14 * 1e9
+        self.assertAlmostEqual(TOTALLED.total_delay(values) * NS, total, places=3)
+        self.assertEqual(TOTALLED.offsets(values)[0], round(total))
+
+    def test_the_parts_are_what_a_run_sets_and_the_total_is_not(self):
+        self.assertEqual([pv for pv, _ in TOTALLED.served()],
+                         ['psc1_rotation_speed', 'psc1_experiment_delay',
+                          'psc1_mechanical_delay', 'pulse_delay', 'psc1_park_angle'])
+
+    def test_all_three_parts_or_none(self):
+        with self.assertRaises(ValueError):
+            Chopper(name='x', tdc='t', speed='s', delay='d', experiment='e')
+
+    def test_the_parts_are_options_on_the_command_line(self):
+        self.assertEqual(parse_chopper(
+            'psc1,psc1_tdc,psc1_rotation_speed,psc1_delay,psc1_park_angle,delay_unit=ns,'
+            'experiment=psc1_experiment_delay,mechanical=psc1_mechanical_delay,'
+            'pulse=pulse_delay'), TOTALLED)
+
+
+class ServedTotalTest(unittest.TestCase):
+
+    def faker(self):
+        faker = _wired((TOTALLED, PSC2))
+        faker.pvs.update({name: _Recorder() for name in faker.total_names()})
+        faker.values.update({'psc1_rotation_speed': 14.0, 'psc1_experiment_delay': 1e6,
+                             'psc1_mechanical_delay': 0.0, 'pulse_delay': 1e4,
+                             'psc2_rotation_speed': 14.0, 'psc2_experiment_delay': 2e6,
+                             'psc2_mechanical_delay': 0.0})
+        return faker
+
+    def test_the_parts_are_inputs_and_a_shared_pulse_delay_is_one_pv(self):
+        faker = FakeTDC((TOTALLED, PSC2))
+        self.assertEqual(faker.input_names().count('pulse_delay'), 1)
+        self.assertNotIn('psc1_delay', faker.input_names())
+        self.assertIn('psc1_delay:d:0.0', faker.strings())
+
+    def test_the_total_is_posted_on_the_pulse_and_again_only_when_it_changes(self):
+        faker = self.faker()
+        faker.emit(5 * PERIOD)
+        faker.emit(6 * PERIOD)
+        posts = faker.pvs['psc1_delay'].posts
+        self.assertEqual(len(posts), 1)
+        self.assertAlmostEqual(posts[0][0], 1e6 + 1e4)
+        self.assertEqual(posts[0][1], divmod(5 * PERIOD, NS))
+        faker.values['pulse_delay'] = 2e4          # moves every disc
+        faker.emit(7 * PERIOD)
+        self.assertAlmostEqual(faker.pvs['psc1_delay'].posts[-1][0], 1e6 + 2e4)
+        self.assertAlmostEqual(faker.pvs['psc2_delay'].posts[-1][0], 2e6 + 2e4)
+
+    def test_the_crossings_follow_the_total(self):
+        faker = self.faker()
+        faker.emit(5 * PERIOD)
+        offsets, _ = faker.pvs['psc1_tdc'].posts[-1]
+        self.assertEqual(list(offsets), [round(1e6 + 1e4)])

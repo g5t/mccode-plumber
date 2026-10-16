@@ -132,6 +132,18 @@ class DelayUnitTest(unittest.TestCase):
         self.assertEqual(text, 'd,a:tdc,a:speed,a:delay,a:park,delay_unit=ns')
         self.assertEqual(parse_chopper(text), disc)
 
+    def test_the_parts_of_a_total_reach_mp_tdc(self):
+        from types import SimpleNamespace
+        from mccode_plumber.tdc import parse_chopper
+        from mccode_plumber.manage.tdc import TDCFaker
+        disc = Chopper('d', 'a:tdc', 'a:Spd_R', 'a:TotDly', delay_unit='ns',
+                       experiment='a:ChopDly-S', mechanical='a:MechDly-S',
+                       pulse='a:BeamPosDly-S')
+        faker = SimpleNamespace(_command=Path('mp-tdc'), pulse_pv='pulse', run_pv='tdc_run',
+                                rate=14.0, choppers=(disc,))
+        argv = TDCFaker.__run_command__(faker)
+        self.assertEqual(parse_chopper(argv[argv.index('--chopper') + 1]), disc)
+
     def test_seconds_stay_implicit_on_the_command_line(self):
         from mccode_plumber.tdc import parse_chopper
         self.assertEqual(parse_chopper('d,tdc,speed,delay').delay_unit, 's')

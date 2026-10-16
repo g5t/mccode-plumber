@@ -448,6 +448,10 @@ def get_chopper_specs(structure) -> list[tuple[Chopper, str]]:
 
     The delay's unit is read off its log -- ESS publishes TotDly in nanoseconds -- so
     the crossings are computed from the number actually published.
+
+    A simulated `delay` that names no parameter is the controller's total, as niess
+    after 0.11 writes it: then the `experiment_delay`, `mechanical_delay` and
+    `pulse_delay` logs name the parameters it is made of, and `mp-tdc` serves the total.
     """
     from mccode_plumber.conductor import DELAY_UNITS
     specs = []
@@ -478,8 +482,9 @@ def get_chopper_specs(structure) -> list[tuple[Chopper, str]]:
         if unit not in DELAY_UNITS:
             raise ValueError(f"Chopper {name!r} publishes its delay in {unit!r}, which is "
                              f"not a time unit this understands ({sorted(DELAY_UNITS)})")
+        parts = _total_delay_parts(name, delay, group, unit)
         park_stream = _node_stream(park)
-        specs.append((Chopper(
+        specs.append((Chopper(**parts,
             name=name, tdc=tdc[0],
             speed=_node_stream(speed)[1], delay=_node_stream(delay)[1],
             park=park_stream[1] if park_stream else None,
@@ -489,6 +494,41 @@ def get_chopper_specs(structure) -> list[tuple[Chopper, str]]:
             delay_unit=unit,
         ), tdc[1] or TOPICS['parameter']))
     return specs
+
+
+#: The logs an ESS controller's total delay is made of, as `Chopper` fields, and the
+#: units each may be in: the delay's own for the two times, degrees for the angle.
+TOTAL_DELAY_PARTS = (('experiment', 'experiment_delay'),
+                     ('mechanical', 'mechanical_delay'),
+                     ('pulse', 'pulse_delay'))
+ANGLE_UNITS = ('degrees', 'deg', 'degree')
+
+
+def _total_delay_parts(name: str, delay: dict, group: dict, unit: str) -> dict:
+    """`Chopper` fields for a disc whose `delay` is the total of three knobs, or none."""
+    if _attribute(delay, SIMULATION_PARAMETER):
+        return {}
+    nodes = {which: _log_node(group, log) for which, log in TOTAL_DELAY_PARTS}
+    fed = {which: node for which, node in nodes.items()
+           if node is not None and _attribute(node, SIMULATION_PARAMETER)}
+    if not fed:
+        return {}
+    if len(fed) != len(TOTAL_DELAY_PARTS):
+        raise ValueError(
+            f"Chopper {name!r}: its delay is a total, but only "
+            f"{sorted(fed)} of experiment, mechanical and pulse name the parameters it is "
+            f"made of; a total needs all three")
+    parts = {}
+    for which, node in fed.items():
+        stream = _node_stream(node)
+        given = stream[3].get('value_units') or ''
+        wanted = ANGLE_UNITS if which == 'mechanical' else (unit,)
+        if given not in wanted:
+            raise ValueError(f"Chopper {name!r} publishes its {which} delay in {given!r}; "
+                             f"a total in {unit!r} needs {' or '.join(wanted)!r}")
+        parts[which] = stream[1]
+        parts[f'{which}_parameter'] = _attribute(node, SIMULATION_PARAMETER)
+    return parts
 
 
 #: What the per-pulse reference log is called, newest first. ECDC names the accelerator's
@@ -585,7 +625,7 @@ def chopper_forwarder_streams(specs, pulse) -> list[dict]:
     from mccode_plumber.forwarder import chopper_partial_streams
     partial = []
     for chopper, topic in specs:
-        values = [n for n in (chopper.speed, chopper.delay, chopper.park) if n]
+        values = chopper.value_pvs()
         partial += chopper_partial_streams([dict(tdc=chopper.tdc, values=values)], topic)
     if pulse is not None:
         partial.append(dict(source=pulse[0], module='f144', topic=pulse[1]))
