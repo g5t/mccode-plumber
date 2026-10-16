@@ -139,6 +139,21 @@ class RequireChopperParametersTest(unittest.TestCase):
             _FakeInstr(_FakeParameter('psc1speed', 14), _FakeParameter('psc1delay', 0)),
             [disc])
 
+    def test_a_total_needs_its_three_parts_not_itself(self):
+        from mccode_plumber.splitrun import (
+            MissingChopperParameter, require_chopper_parameters,
+        )
+        disc = Chopper(name='psc1', tdc='t', speed='psc1speed', delay='psc1delay',
+                       delay_unit='ns', experiment='x', mechanical='m', pulse='p',
+                       experiment_parameter='psc1x', mechanical_parameter='psc1m',
+                       pulse_parameter='pulse_delay')
+        parts = [_FakeParameter(n, 0) for n in ('psc1speed', 'psc1x', 'psc1m')]
+        with self.assertRaises(MissingChopperParameter) as raised:
+            require_chopper_parameters(_FakeInstr(*parts), [disc])
+        self.assertIn('psc1 pulse (pulse_delay)', str(raised.exception))
+        require_chopper_parameters(
+            _FakeInstr(*parts, _FakeParameter('pulse_delay', 0)), [disc])
+
     def test_a_missing_park_angle_is_only_warned_about(self):
         from mccode_plumber.splitrun import require_chopper_parameters
         instr = _FakeInstr(_FakeParameter('psc1speed', 14), _FakeParameter('psc1delay', 0))

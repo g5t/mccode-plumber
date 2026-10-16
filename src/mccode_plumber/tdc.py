@@ -3,8 +3,9 @@
 An ESS `NXdisk_chopper` wants a `tdct` stream: a vector of absolute nanoseconds saying
 when the disc's mark passed its pickup. The PV behind it holds those times as offsets
 from its own EPICS timestamp, and the forwarder adds the stamp back. A simulation never measures that. It records the
-two numbers the crossings follow from -- the disc's speed and its delay -- and the times
-are `delay + k/|speed|` after a pulse.
+numbers the crossings follow from -- the disc's speed and its delay, or the three delays
+an ESS controller adds up to it -- and the times are `delay + k/|speed|` after a pulse.
+For a disc with the three, the total is served here too, as the controller's `TotDly`.
 
 `conductor.py` already computes them, for the replay that does not exist yet: there the
 pulse instant comes from `readout-replay`, which knows exactly when it sent the events a
@@ -25,7 +26,7 @@ from dataclasses import dataclass, field
 
 from p4p.nt import NTScalar
 
-from .conductor import NS, Chopper
+from .conductor import DELAY_UNITS, NS, Chopper
 
 #: The ESS source frequency. `Chopper.crossings` assumes it too, when deciding how many
 #: turns of a disc fall inside one pulse.
@@ -90,21 +91,28 @@ class FakeTDC:
     values: dict = field(default_factory=dict, init=False)
     pvs: dict = field(default_factory=dict, init=False)
     running: bool = field(default=False, init=False)
+    #: The total delay last posted for each disc that has one, so it is posted on change.
+    totals: dict = field(default_factory=dict, init=False)
 
     # -- the PVs ---------------------------------------------------------------------
 
     def input_names(self) -> list[str]:
-        """The parameter PVs a scan writes: speed, delay and, if it has one, park.
+        """The parameter PVs a scan writes: speed, the delay or the three it is made of,
+        and, if it has one, park.
 
         Ordered and de-duplicated rather than a set, so the printed startup line reads the
-        same way twice running.
+        same way twice running -- and so a pulse delay every disc shares is one PV.
         """
         names = []
         for chopper in self.choppers:
-            for name in (chopper.speed, chopper.delay, chopper.park):
-                if name and name not in names:
+            for name, _ in chopper.served():
+                if name not in names:
                     names.append(name)
         return names
+
+    def total_names(self) -> list[str]:
+        """The delay PVs this server computes rather than is told: each disc's total."""
+        return [c.delay for c in self.choppers if c.totalled]
 
     def strings(self) -> list[str]:
         """Every PV this server offers, in `mp-epics-strings` form.
@@ -115,7 +123,7 @@ class FakeTDC:
         otherwise record one crossing at the epoch.
         """
         out = [f'{c.tdc}:aL:[]' for c in self.choppers]
-        out += [f'{name}:d:0.0' for name in self.input_names()]
+        out += [f'{name}:d:0.0' for name in self.input_names() + self.total_names()]
         out.append(f'{self.pulse_pv}:d:0.0')
         out.append(f'{self.run_pv}:i:0')
         return out
@@ -126,7 +134,8 @@ class FakeTDC:
         from .epics import strings_to_instr_par_nt
 
         provider = StaticProvider('tdc')
-        outputs = {c.tdc for c in self.choppers} | {self.pulse_pv}
+        outputs = ({c.tdc for c in self.choppers} | {self.pulse_pv}
+                   | set(self.total_names()))
         for name, code, default in strings_to_instr_par_nt(self.strings()):
             if name in outputs:
                 handler = None  # written by the pulse loop, not by anyone else
@@ -152,12 +161,21 @@ class FakeTDC:
         A TDC PV holds each crossing's *offset* from its stamp, in nanoseconds. The
         forwarder's `tdct` serialiser adds the stamp to every element, which is how an
         ESS chopper's timestamps are published: relative to the EPICS update.
+
+        A disc whose delay is the total of three gets that total posted, in its delay
+        unit, whenever it differs from the last one posted -- as a controller's ``TotDly``
+        changes only when one of its parts does.
         """
         import numpy as np
         from .conductor import pulse_stamp
         stamp = pulse_stamp(pulse_ns)
         self.pvs[self.pulse_pv].post(PULSE_VALUE, timestamp=stamp)
         for chopper in self.choppers:
+            if chopper.totalled:
+                total = chopper.total_delay(self.values) / DELAY_UNITS[chopper.delay_unit]
+                if self.totals.get(chopper.delay) != total:
+                    self.totals[chopper.delay] = total
+                    self.pvs[chopper.delay].post(total, timestamp=stamp)
             offsets = chopper.offsets(self.values)
             if offsets:
                 self.pvs[chopper.tdc].post(
@@ -226,22 +244,27 @@ def main(choppers, pulse_pv: str = 'pulse', run_pv: str = 'tdc_run',
         faker.run()
 
 
+#: `parse_chopper`'s ``key=value`` options.
+CHOPPER_OPTIONS = ('delay_unit', 'experiment', 'mechanical', 'pulse')
+CHOPPER_FORMAT = ('name,tdc,speed,delay[,park][,delay_unit=ns]'
+                  '[,experiment=PV,mechanical=PV,pulse=PV]')
+
+
 def parse_chopper(text: str) -> Chopper:
-    """`name,tdc,speed,delay[,park][,delay_unit=ns]` -- the names a crossing needs.
+    """`name,tdc,speed,delay[,park]` and options -- the names a crossing needs.
 
     Two namespaces in one argument, on purpose: `tdc` is a control-system channel while
     `speed` and `delay` are McStas parameter names. They are separate fields in `Chopper`
-    for the same reason. Options come last, as `key=value`; the only one is the unit the
-    delay is published in, seconds unless it says otherwise.
+    for the same reason. Options come last, as `key=value`: the unit the delay is
+    published in, seconds unless it says otherwise, and -- for a disc whose `delay` is
+    the total of the three ESS delays -- the PVs of those three.
     """
     parts = [p.strip() for p in text.split(',')]
     options = dict(p.split('=', 1) for p in parts if '=' in p)
     names = [p for p in parts if '=' not in p]
-    unknown = set(options) - {'delay_unit'}
+    unknown = set(options) - set(CHOPPER_OPTIONS)
     if len(names) not in (4, 5) or unknown:
-        raise ValueError(
-            f'Expected name,tdc,speed,delay[,park][,delay_unit=ns] for a chopper; '
-            f'got {text!r}')
+        raise ValueError(f'Expected {CHOPPER_FORMAT} for a chopper; got {text!r}')
     return Chopper(*names, **options)
 
 
@@ -251,7 +274,7 @@ def get_parser():
     p = ArgumentParser(
         description='Serve fake chopper top-dead-centre times on the pulse grid')
     p.add_argument('-c', '--chopper', type=parse_chopper, action='append', default=[],
-                   metavar='name,tdc,speed,delay[,park][,delay_unit=ns]',
+                   metavar=CHOPPER_FORMAT,
                    help='One disc chopper; repeat for each')
     p.add_argument('--pulse-pv', type=str, default='pulse',
                    help='PV carrying one reference sample per pulse')

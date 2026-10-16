@@ -39,5 +39,8 @@ class TDCFaker(Manager):
             names = [c.name, c.tdc, c.speed, c.delay] + ([c.park] if c.park else [])
             if c.delay_unit != 's':
                 names.append(f'delay_unit={c.delay_unit}')
+            if c.totalled:
+                names += [f'{which}={getattr(c, which)}'
+                          for which in ('experiment', 'mechanical', 'pulse')]
             argv += ['--chopper', ','.join(names)]
         return argv

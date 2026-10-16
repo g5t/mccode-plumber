@@ -143,7 +143,9 @@ class NiessStructureTest(unittest.TestCase):
                'orientation': rotations_from_rotvecs(vector([0, 0, 0.0], unit='deg')),
                'radius': scalar(0.35, unit='m'), 'height': scalar(0.06, unit='m'),
                'angle': scalar(170., unit='deg'), 'frequency': scalar(14., unit='Hz'),
-               'delay': scalar(0., unit='s'), 'beam_angle': scalar(180., unit='deg')}
+               # niess before 0.12 ignores it and takes a zero `delay`
+               'experiment_delay': scalar(0., unit='s'),
+               'beam_angle': scalar(180., unit='deg')}
 
         class Chopped(Section):
             disc: DiscChopper
@@ -160,8 +162,22 @@ class NiessStructureTest(unittest.TestCase):
         (chopper, _), = get_chopper_specs(self.structure())
         self.assertEqual((chopper.tdc, chopper.speed, chopper.delay, chopper.park),
                          ('psc1_tdc', 'psc1_rotation_speed', 'psc1_delay', 'psc1_park_angle'))
-        self.assertEqual(chopper.parameter('delay'), 'psc1_delay')
         self.assertEqual(chopper.delay_unit, 'ns')
+        if not chopper.totalled:
+            self.assertEqual(chopper.parameter('delay'), 'psc1_delay')
+
+    def test_a_total_delay_is_made_of_the_three_ess_delays(self):
+        """niess >= 0.12 gives a disc the ESS controller's three delays as knobs, and
+        writes their total as `delay`, which names no parameter."""
+        (chopper, _), = get_chopper_specs(self.structure())
+        if not chopper.totalled:
+            self.skipTest('this niess writes the delay as a knob')
+        self.assertEqual(chopper.delay_parameter, None)
+        self.assertEqual(
+            [chopper.parameter(which) for which in ('experiment', 'mechanical', 'pulse')],
+            ['psc1_experiment_delay', 'psc1_mechanical_delay', 'pulse_delay'])
+        self.assertEqual(chopper.inputs(),
+                         ('speed', 'experiment', 'mechanical', 'pulse', 'park'))
 
     def test_the_pulse_reference_is_found(self):
         self.assertIsNotNone(get_pulse_stream(self.structure()))
@@ -169,3 +185,52 @@ class NiessStructureTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def fed(name, source, parameter, units, module='f144'):
+    """A simulated log naming the parameter that fills it, in the unit it is published in."""
+    node = log(name, module, source)
+    node['children'][0]['config']['value_units'] = units
+    if parameter:
+        node['attributes'].append({'name': 'simulation_parameter', 'values': parameter})
+    return node
+
+
+def totalled(mechanical_units='degrees', parts=('experiment', 'mechanical', 'pulse')):
+    """A disc as niess >= 0.12 writes it: three fed delays, and a total naming none."""
+    logs = [fed('rotation_speed', 'psc1_rotation_speed', 'psc1_rotation_speed', 'Hz'),
+            log('top_dead_center', 'tdct', 'psc1_tdc'),
+            fed('delay', 'psc1_delay', None, 'ns')]
+    if 'experiment' in parts:
+        logs.append(fed('experiment_delay', 'psc1_experiment_delay',
+                        'psc1_experiment_delay', 'ns'))
+    if 'mechanical' in parts:
+        logs.append(fed('mechanical_delay', 'psc1_mechanical_delay',
+                        'psc1_mechanical_delay', mechanical_units))
+    if 'pulse' in parts:
+        logs.append(fed('pulse_delay', 'pulse_delay', 'pulse_delay', 'ns'))
+    return disc(logs=logs)
+
+
+class TotalDelayDiscoveryTest(unittest.TestCase):
+
+    def test_a_delay_naming_no_parameter_is_the_total_of_the_three(self):
+        (chopper, _), = get_chopper_specs(nested(totalled()))
+        self.assertTrue(chopper.totalled)
+        self.assertEqual((chopper.experiment, chopper.mechanical, chopper.pulse),
+                         ('psc1_experiment_delay', 'psc1_mechanical_delay', 'pulse_delay'))
+        self.assertEqual(chopper.parameter('pulse'), 'pulse_delay')
+
+    def test_the_forwarder_is_told_about_every_value_mp_tdc_serves(self):
+        specs = get_chopper_specs(nested(totalled()))
+        sources = {s['source'] for s in chopper_forwarder_streams(specs, None)}
+        self.assertTrue({'psc1_delay', 'psc1_experiment_delay', 'psc1_mechanical_delay',
+                         'pulse_delay'} <= sources)
+
+    def test_a_total_missing_one_of_its_parts_is_refused(self):
+        with self.assertRaises(ValueError):
+            get_chopper_specs(nested(totalled(parts=('experiment', 'pulse'))))
+
+    def test_a_mechanical_delay_that_is_not_an_angle_is_refused(self):
+        with self.assertRaises(ValueError):
+            get_chopper_specs(nested(totalled(mechanical_units='ns')))

@@ -7,7 +7,8 @@ so that library stays dependency-light.
 
 What this adds beyond passing values through is the chopper half. An ESS `NXdisk_chopper`
 wants a stream of top-dead-centre times, and a simulation does not record them: it
-records the two numbers they follow from, the disc's speed and its delay. So the times
+records the numbers they follow from, the disc's speed and its delay -- or, for niess
+after 0.11, the three delays an ESS controller adds up to it. So the times
 are computed here, from those parameters and the pulse the replayer just started, and
 written to the chopper's TDC channel as a vector of nanosecond offsets from the pulse,
 stamped with the pulse instant. The external forwarder adds that stamp to every element
@@ -46,6 +47,12 @@ class Chopper:
     PV, which is how a structure without `simulation_parameter` attributes spells it.
 
     ``delay_unit`` is the unit the delay is published in, one of `DELAY_UNITS`.
+
+    A disc may instead have the three delays an ESS chopper controller adds up --
+    ``experiment`` (``ChopDly-S``), ``mechanical`` (``MechDly-S``, degrees) and ``pulse``
+    (``BeamPosDly-S``) -- in which case ``delay`` is no knob but their total, ``TotDly``,
+    which the controller forms as ``MechDly / (360 |speed|) + BeamPosDly + ChopDly``. The
+    experiment and pulse delays are in ``delay_unit`` too. See `total_delay`.
     """
     name: str
     tdc: str
@@ -56,20 +63,65 @@ class Chopper:
     delay_parameter: Optional[str] = None
     park_parameter: Optional[str] = None
     delay_unit: str = 's'
+    experiment: Optional[str] = None
+    mechanical: Optional[str] = None
+    pulse: Optional[str] = None
+    experiment_parameter: Optional[str] = None
+    mechanical_parameter: Optional[str] = None
+    pulse_parameter: Optional[str] = None
 
     def __post_init__(self):
         if self.delay_unit not in DELAY_UNITS:
             raise ValueError(f'Chopper {self.name!r}: unknown delay unit '
                              f'{self.delay_unit!r}; expected one of {sorted(DELAY_UNITS)}')
+        parts = (self.experiment, self.mechanical, self.pulse)
+        if any(parts) and not all(parts):
+            raise ValueError(f'Chopper {self.name!r}: a total delay needs all three of '
+                             f'experiment, mechanical and pulse; got {parts}')
+
+    @property
+    def totalled(self) -> bool:
+        """Whether ``delay`` is the total of three knobs rather than a knob itself."""
+        return self.experiment is not None
+
+    def inputs(self) -> tuple[str, ...]:
+        """Which of this disc's values a run sets, by field name."""
+        delays = ('experiment', 'mechanical', 'pulse') if self.totalled else ('delay',)
+        return tuple(which for which in ('speed', *delays, 'park') if getattr(self, which))
 
     def parameter(self, which: str) -> Optional[str]:
-        """The instrument parameter behind one of ``speed``, ``delay`` or ``park``."""
+        """The instrument parameter behind one of this disc's values, e.g. ``speed``."""
         return getattr(self, f'{which}_parameter') or getattr(self, which)
 
     def served(self) -> list[tuple[str, str]]:
-        """``(pv, parameter)`` for every value this disc's PVs carry."""
-        return [(getattr(self, which), self.parameter(which))
-                for which in ('speed', 'delay', 'park') if getattr(self, which)]
+        """``(pv, parameter)`` for every value a run sets on this disc's PVs."""
+        return [(getattr(self, which), self.parameter(which)) for which in self.inputs()]
+
+    def value_pvs(self) -> list[str]:
+        """Every `f144` PV this disc has: its inputs, and a total delay if it has one."""
+        return [getattr(self, which) for which in
+                ('speed', 'delay', 'experiment', 'mechanical', 'pulse', 'park')
+                if getattr(self, which)]
+
+    def total_delay(self, values: dict[str, float], by_parameter: bool = False) -> float:
+        """When the disc's mark passes the sensor, in seconds after the pulse.
+
+        The ``delay`` value itself, or -- for a disc with the three ESS delays -- their
+        total, formed as the controller's ``evr_seq_calc`` forms ``TotDly``. A disc that
+        is not turning contributes no mechanical part. ``values`` is keyed as for
+        `offsets`.
+        """
+        def value(which):
+            key = self.parameter(which) if by_parameter else getattr(self, which)
+            return float(values.get(key, 0.0))
+        unit = DELAY_UNITS[self.delay_unit]
+        if not self.totalled:
+            return value('delay') * unit
+        speed = value('speed')
+        total = (value('experiment') + value('pulse')) * unit
+        if speed:
+            total += value('mechanical') / (360.0 * abs(speed))
+        return total
 
     def crossings(self, pulse_ns: int, values: dict[str, float],
                   by_parameter: bool = False) -> list[int]:
@@ -89,8 +141,8 @@ class Chopper:
         holding these offsets forwards the absolute crossing times. Absolute times on
         the PV would have the epoch added twice.
 
-        The disc turns at ``speed`` and its mark reaches the beam ``delay`` after the
-        pulse, so the crossings are ``delay + k/|speed|`` -- the same arithmetic the
+        The disc turns at ``speed`` and its mark passes the sensor `total_delay` after
+        the pulse, so the crossings are ``delay + k/|speed|`` -- the same arithmetic the
         emitted McStas already does to offset each opening from the disc's own delay.
 
         ``values`` is keyed by PV name, or by parameter name with ``by_parameter``: the
@@ -106,12 +158,10 @@ class Chopper:
         would silently drop real events.
         """
         speed_key = self.parameter('speed') if by_parameter else self.speed
-        delay_key = self.parameter('delay') if by_parameter else self.delay
         speed = float(values.get(speed_key, 0.0))
         if not speed:
             return []
-        delay = float(values.get(delay_key, 0.0)) * DELAY_UNITS[self.delay_unit]
-        delay_ns = int(round(delay * NS))
+        delay_ns = int(round(self.total_delay(values, by_parameter) * NS))
         period_ns = int(round(NS / abs(speed)))
         if period_ns <= 0:
             return []

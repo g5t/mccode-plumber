@@ -137,7 +137,7 @@ class MissingChopperParameter(ValueError):
 
 
 def require_chopper_parameters(instr, choppers) -> None:
-    """Refuse a disc whose speed or delay is not an instrument parameter.
+    """Refuse a disc whose speed or delays are not instrument parameters.
 
     A disc's top-dead-centre crossings are computed from its speed and delay, and the
     only values for them anyone has are the instrument parameters a run sets -- recorded
@@ -148,8 +148,7 @@ def require_chopper_parameters(instr, choppers) -> None:
     """
     declared = {parameter.name.lower() for parameter in instr.parameters}
     missing = [f'{chopper.name} {which} ({chopper.parameter(which)})'
-               for chopper in choppers for which in ('speed', 'delay')
-               if getattr(chopper, which)
+               for chopper in choppers for which in chopper.inputs() if which != 'park'
                and chopper.parameter(which).lower() not in declared]
     if missing:
         raise MissingChopperParameter(
