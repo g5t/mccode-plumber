@@ -43,6 +43,10 @@ class KafkaToNexus(Manager):
             '--job-pool-topic', self.pool,
             #'--service-name', 'mpw',
             f'--hdf-output-prefix={self.work}/',
+            # A start message naming its instrument, as NICOS' does, makes the writer
+            # begin from the template <prefix>/<instrument>/<instrument>.hdf. Look for it
+            # beside the output rather than in whatever directory this was started from.
+            f'--hdf-template-prefix={self.work}/',
             '--kafka-error-timeout', '10s',
             '--kafka-metadata-max-timeout', '10s',
             '--time-before-start', '10s',
