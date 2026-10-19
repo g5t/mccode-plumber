@@ -5,7 +5,7 @@ from textual.widgets import Static
 from textual.reactive import reactive
 from textual import events
 
-from p4p.client.thread import Context
+from mccode_plumber.pva import context
 from p4p.client.thread import Disconnected
 
 import asyncio
@@ -46,7 +46,7 @@ class PVMonitorApp(App):
     def __init__(self, prefix: str, names: list[str]):
         super().__init__()
         self.pv_widgets: dict[str, PVWidget]= {}
-        self.ctx = Context("pva")  # Or 'ca' if using Channel Access
+        self.ctx = context()
         self.prefix = prefix
         self.names = names
         self.grid: None | Grid = None

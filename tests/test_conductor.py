@@ -76,8 +76,8 @@ class MailboxTestCase(unittest.TestCase):
         cls.proc.start()
 
         import time
-        from p4p.client.thread import Context
-        cls.ctx = Context('pva')
+        from mccode_plumber.pva import context
+        cls.ctx = context()
         deadline = time.time() + 30
         ready = False
         while time.time() < deadline:

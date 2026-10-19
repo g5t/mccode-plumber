@@ -1068,8 +1068,8 @@ def stop_faking_tdc(choppers) -> None:
     if not choppers:
         return
     try:
-        from p4p.client.thread import Context
-        context = Context('pva')
+        from mccode_plumber.pva import context as loopback_context
+        context = loopback_context()
         context.put(RUN_PV, 0)
         context.close()
     except Exception as error:

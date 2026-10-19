@@ -181,7 +181,7 @@ def parameter_pvs_callback_with_arguments(instr, choppers, run_pv: str | None,
     where these parameters still hold their defaults. The put is idempotent, so every point
     may safely repeat it. With no choppers there is no run PV to set.
     """
-    from p4p.client.thread import Context
+    from mccode_plumber.pva import context as loopback_context
 
     targets = [pair for c in choppers for pair in c.served()]
     targets += [(log.source, log.parameter) for log in logs]
@@ -195,7 +195,7 @@ def parameter_pvs_callback_with_arguments(instr, choppers, run_pv: str | None,
 
     def callback(pars):
         if not context:
-            context.append(Context('pva'))
+            context.append(loopback_context())
         values = dict(defaults)
         values.update({str(k).lower(): v for k, v in pars.items()})
         for pv, parameter in targets:

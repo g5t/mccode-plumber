@@ -4,6 +4,8 @@ from __future__ import annotations
 from p4p.nt import NTScalar
 from p4p.server import Server, StaticProvider
 from p4p.server.thread import SharedPV
+
+from mccode_plumber.pva import SERVING
 from pathlib import Path
 from typing import Union
 
@@ -148,7 +150,7 @@ def main(names: dict[str, NTScalar], prefix: str | None = None, filename_require
 
     print(f'Start mailbox server for {len(pvs)} PVs with prefix {prefix}'
           + (f', {len(exact)} of them named exactly' if exact else ''))
-    Server.forever(providers=[provider])
+    Server.forever(providers=[provider], **SERVING)
     print('Done')
 
 
@@ -199,7 +201,7 @@ def parse_like(current, text: str):
 
 def update():
     from argparse import ArgumentParser
-    from p4p.client.thread import Context
+    from mccode_plumber.pva import context
     parser = ArgumentParser(description="Update the mailbox server with new values")
     parser.add_argument('address value', type=str, nargs='+', help='The mailbox address and value to be updated')
     args = parser.parse_args()
@@ -215,7 +217,7 @@ def update():
     if len(addresses_values) % 2:
         print(f'Please provide address-value pairs. Provided {addresses=} {values=}')
 
-    ctx = Context('pva')
+    ctx = context()
     for address, value in zip(addresses, values):
         pv = ctx.get(address, throw=False)
         if isinstance(pv, TimeoutError):
