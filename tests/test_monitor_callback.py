@@ -7,12 +7,18 @@ from mccode_plumber.splitrun import monitors_to_kafka_callback_for_topics
 def sent(monkeypatch):
     calls = []
 
-    def fake_send(root, names=None, topic=None, broker=None, remove=False, **kwargs):
-        calls.append({'root': root, 'names': list(names) if names else names,
-                      'topic': topic, 'remove': remove})
+    def fake_send(root, name, topic, source, broker):
+        calls.append({'root': root, 'name': name, 'topic': topic, 'source': source})
 
-    monkeypatch.setattr('mccode_to_kafka.sender.send_histograms', fake_send)
+    monkeypatch.setattr('mccode_plumber.splitrun._send_histogram', fake_send)
     return calls
+
+
+def by_topic(calls):
+    grouped = {}
+    for c in calls:
+        grouped.setdefault(c['topic'], []).append(c['name'])
+    return grouped
 
 
 @pytest.fixture
@@ -28,9 +34,7 @@ class TestRouting:
             'localhost:9092', {'mon_a': ['cbm1'], 'mon_b': ['cbm2', 'cbm3']}
         )
         callback(root=histograms)
-        assert [(c['topic'], c['names']) for c in sent] == [
-            ('mon_a', ['cbm1']), ('mon_b', ['cbm2', 'cbm3'])
-        ]
+        assert by_topic(sent) == {'mon_a': ['cbm1'], 'mon_b': ['cbm2', 'cbm3']}
 
     def test_the_directory_is_passed_as_root(self, sent, histograms):
         callback, args = monitors_to_kafka_callback_for_topics(
@@ -40,6 +44,11 @@ class TestRouting:
         callback(root=histograms)
         assert sent[0]['root'] == histograms
 
+    def test_a_file_root_sends_that_histogram(self, sent, histograms):
+        callback, _ = monitors_to_kafka_callback_for_topics('localhost:9092', {'mon': []})
+        callback(root=histograms / 'cbm2.dat')
+        assert [(c['root'], c['name']) for c in sent] == [(histograms, 'cbm2')]
+
     def test_an_empty_name_list_takes_every_histogram(self, sent, histograms):
         # The fallback for a structure that declares no monitor stream. An empty list
         # reaching send_histograms verbatim would send nothing at all.
@@ -47,7 +56,21 @@ class TestRouting:
             'localhost:9092', {'mon': []}
         )
         callback(root=histograms)
-        assert sorted(sent[0]['names']) == ['cbm1', 'cbm2', 'cbm3']
+        assert sorted(c['name'] for c in sent) == ['cbm1', 'cbm2', 'cbm3']
+
+    def test_a_list_publishes_each_monitor_under_its_own_name(self, sent, histograms):
+        callback, _ = monitors_to_kafka_callback_for_topics('localhost:9092', {'mon': ['cbm1']})
+        callback(root=histograms)
+        assert [(c['name'], c['source']) for c in sent] == [('cbm1', 'cbm1')]
+
+    def test_a_monitor_publishes_under_the_source_it_is_given(self, sent, histograms):
+        # ECDC's structures fill psc_monitor from cbm1: the histogram keeps its name.
+        callback, _ = monitors_to_kafka_callback_for_topics(
+            'localhost:9092', {'mon': {'cbm1': 'beam_monitor_1'}}
+        )
+        callback(root=histograms)
+        assert [(c['name'], c['source']) for c in sent] == [('cbm1', 'beam_monitor_1')]
+        assert not (histograms / 'cbm1.dat').exists()
 
 
 class TestRemoval:
@@ -67,8 +90,7 @@ class TestRemoval:
             'localhost:9092', {'mon_a': ['cbm1'], 'mon_b': ['cbm1']}
         )
         callback(root=histograms)
-        assert [c['names'] for c in sent] == [['cbm1'], ['cbm1']]
-        assert all(c['remove'] is False for c in sent)
+        assert by_topic(sent) == {'mon_a': ['cbm1'], 'mon_b': ['cbm1']}
         assert not (histograms / 'cbm1.dat').exists()
 
     def test_removal_can_be_declined(self, sent, histograms):

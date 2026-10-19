@@ -1,7 +1,8 @@
 """The module-aware view of a NeXus structure's stream directives."""
 from mccode_plumber.manage.orchestrate import (
     EVENT_MODULES, MONITOR_MODULES, Stream, event_topic_from_streams,
-    get_stream_modules, get_stream_pairs, sources_by_topic, streams_of_module,
+    get_stream_modules, get_stream_pairs, monitor_histograms, sources_by_topic,
+    streams_of_module,
     topics_of,
 )
 import pytest
@@ -104,3 +105,37 @@ class TestRealStructure:
         streams = get_stream_modules(load(path.open()))
         assert streams == [Stream('da00', 'teaching_beam_monitor', 'monitor')]
         assert event_topic_from_streams(streams) is None
+
+
+def monitor(name, *children):
+    return {'type': 'group', 'name': name, 'children': list(children),
+            'attributes': [{'name': 'NX_class', 'values': 'NXmonitor'}]}
+
+
+def nxdata(*children):
+    return {'type': 'group', 'name': 'data', 'children': list(children),
+            'attributes': [{'name': 'NX_class', 'values': 'NXdata'}]}
+
+
+class TestMonitorHistograms:
+    def test_the_monitor_group_names_the_histogram(self):
+        # As ECDC's BIFROST structure writes it: the group is ours, the source the EFU's.
+        s = structure(monitor('psc_monitor', nxdata(stream('da00', 'mon', 'cbm1'))))
+        assert monitor_histograms(s) == {'mon': {'psc_monitor': 'cbm1'}}
+
+    def test_a_directive_outside_a_monitor_is_named_by_its_source(self):
+        s = structure(stream('da00', 'mon', 'cbm1'))
+        assert monitor_histograms(s) == {'mon': {'cbm1': 'cbm1'}}
+
+    def test_event_streams_are_not_histograms(self):
+        s = structure(monitor('elastic_monitor', nxdata(stream('ev44', 'mon', 'cbm5'))))
+        assert monitor_histograms(s) == {}
+
+    def test_monitors_are_grouped_by_topic(self):
+        s = structure(
+            monitor('a', stream('da00', 'one', 'cbm1')),
+            monitor('b', stream('da00', 'two', 'cbm2')),
+            monitor('c', stream('da00', 'one', 'cbm3')),
+        )
+        assert monitor_histograms(s) == {'one': {'a': 'cbm1', 'c': 'cbm3'},
+                                         'two': {'b': 'cbm2'}}

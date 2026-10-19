@@ -43,44 +43,51 @@ def monitors_to_kafka_callback_with_arguments(
 
 
 def monitors_to_kafka_callback_for_topics(
-        broker: str, sources: dict[str, list[str]],
+        broker: str, sources: dict[str, dict[str, str] | list[str]],
         delete_after_sending: bool = True,
 ):
     """Send each monitor's histogram to the topic a NeXus structure puts it on.
 
-    `sources` maps topic to the monitor names published there, as
-    `orchestrate.sources_by_topic` groups them. A topic mapped to an empty list takes
-    every histogram found, which is what a structure declaring no monitor stream falls
-    back to.
+    `sources` maps topic to the monitors published there, each as histogram name to
+    Kafka source name, as `orchestrate.monitor_sources_and_topics` reads them from the
+    structure. A list of names publishes each under its own name. A topic mapped to
+    nothing takes every histogram found, which is what a structure declaring no monitor
+    stream falls back to.
 
-    `send_histograms` takes a single topic per call, so several topics means several
-    calls rather than one call carrying a topic per name. Removal is held back until
-    every call has run and then done here by name: `send_histograms(remove=True)`
-    deletes the files that call sent, so a monitor published on two topics would have
-    its file deleted by the first call and be missing from the second.
+    Each histogram gets its own sink, because the source is a property of the sink.
+    Removal is held back until every topic has sent: a monitor published on two topics
+    must still be there for the second.
     """
     from pathlib import Path as _Path
-    from mccode_to_kafka.sender import send_histograms
 
     def callback(*args, **kwargs):
         root = kwargs.get('root', args[0] if args else None)
         root = _Path(root)
-        # Resolve 'everything found' to actual names before sending, so that what gets
-        # removed afterwards is exactly what got sent. Mirrors send_histograms' own
-        # discovery, including a root that names a single .dat file.
         if root.is_file():
             found, root = [root.stem], root.parent
         else:
             found = [_Path(x).stem for x in root.glob('*.dat')]
-        groups = {t: (list(names) if names else found) for t, names in sources.items()}
+        groups = {t: (dict(zip(names, names)) if isinstance(names, list) else dict(names))
+                  or {n: n for n in found} for t, names in sources.items()}
 
         for topic, names in groups.items():
-            send_histograms(root, names=names, topic=topic, broker=broker, remove=False)
+            for name, source in names.items():
+                _send_histogram(root, name, topic, source, broker)
 
         if delete_after_sending:
             _remove_histograms(root, {n for names in groups.values() for n in names})
 
     return callback, {'dir': 'root'}
+
+
+def _send_histogram(root, name, topic, source, broker):
+    """Publish one histogram file, if the simulation wrote it, under `source`."""
+    from mccode_to_kafka.sender import HistogramInfo
+    from mccode_to_kafka.histogram import create_histogram_sink
+    histogram = HistogramInfo(root, name)
+    if histogram.exists:
+        sink = create_histogram_sink({'data_brokers': [broker], 'source': source}, {})
+        sink.send_histogram(topic, histogram.data, information=histogram.message)
 
 
 def _remove_histograms(root, names):
