@@ -962,24 +962,54 @@ def load_in_wait_load_out(**kwargs):
             service.stop()
 
 
-def monitor_sources_and_topics(structure, instr) -> tuple[dict[str, list[str]], list[str]]:
+def monitor_histograms(data) -> dict[str, dict[str, str]]:
+    """Each topic's monitors, as histogram name to the source the structure gives it.
+
+    The histogram is named by the `NXmonitor` group holding the directive, and published
+    under the directive's source, so the two can differ: ECDC's BIFROST structure fills
+    `psc_monitor` from `cbm1`, as the beam monitor EFU names it. A directive outside any
+    `NXmonitor` names its histogram by its source, as every structure did before.
+    """
+    found: dict[str, dict[str, str]] = {}
+
+    def walk(node, monitor):
+        if isinstance(node, (list, tuple)):
+            for entry in node:
+                walk(entry, monitor)
+        elif isinstance(node, dict):
+            if _nx_class(node) == 'NXmonitor' and isinstance(node.get('name'), str):
+                monitor = node['name']
+            config = node.get('config')
+            if node.get('module') in MONITOR_MODULES and isinstance(config, dict):
+                topic, source = config.get('topic'), config.get('source')
+                if isinstance(topic, str) and isinstance(source, str):
+                    found.setdefault(topic, {})[monitor or source] = source
+            for value in node.values():
+                walk(value, monitor)
+
+    walk(data, None)
+    return found
+
+
+def monitor_sources_and_topics(structure, instr) -> tuple[dict[str, dict[str, str]], list[str]]:
     """Which monitors publish on which topic, and every topic the structure names.
 
     Where each monitor publishes comes from the structure's own da00 directives, not
     from rebuilding a topic name out of the instrument name. Reconstructing it meant
     holding the same naming convention in two repositories, and disagreeing with it
     produced no error -- just an empty name list, and monitor data nobody received.
-    Reading the directives also means several monitor topics work as written.
+    Reading the directives also means several monitor topics work as written, and each
+    monitor publishes under the source its directive names (see `monitor_histograms`).
     """
     streams = get_stream_modules(structure)
-    monitor_sources = sources_by_topic(streams_of_module(streams, MONITOR_MODULES))
+    monitor_sources = monitor_histograms(structure)
     topics = topics_of(streams)  # ensure all topics are known to Kafka
     if not monitor_sources:
         # No da00 directive to read: keep sending every histogram to the topic this
         # has always derived, rather than sending nothing at all. A structure that
         # predates monitor streams still gets its monitors published.
         monitor_topic = f'{instr.name}_beam_monitor'
-        monitor_sources = {monitor_topic: []}
+        monitor_sources = {monitor_topic: {}}
         if monitor_topic not in topics:
             topics.append(monitor_topic)
     return monitor_sources, topics
