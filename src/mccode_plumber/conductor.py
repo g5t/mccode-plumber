@@ -203,8 +203,8 @@ class ChopperPublisher:
 
     def __post_init__(self):
         if self.context is None:
-            from p4p.client.thread import Context
-            self.context = Context('pva')
+            from mccode_plumber.pva import context
+            self.context = context()
 
     # -- the ParameterPublisher contract ------------------------------------------
 

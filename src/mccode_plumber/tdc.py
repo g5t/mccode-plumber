@@ -236,9 +236,10 @@ class RunHandler:
 def main(choppers, pulse_pv: str = 'pulse', run_pv: str = 'tdc_run',
          rate: float = PULSE_RATE) -> None:
     from p4p.server import Server
+    from mccode_plumber.pva import SERVING
     faker = FakeTDC(tuple(choppers), pulse_pv=pulse_pv, run_pv=run_pv, rate=rate)
     provider = faker.provider()
-    with Server(providers=[provider]):
+    with Server(providers=[provider], **SERVING):
         print(f'Starting fake top-dead-centre server for {len(faker.choppers)} '
               f'chopper(s) at {rate} Hz, waiting on {run_pv}', flush=True)
         faker.run()

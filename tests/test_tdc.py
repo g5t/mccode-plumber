@@ -193,7 +193,7 @@ class ServerTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         import time
-        from p4p.client.thread import Context
+        from mccode_plumber.pva import context
         p = f't{uuid4().hex[:8]}:'
         cls.disc = Chopper(name='psc1', tdc=f'{p}psc1_tdc', speed=f'{p}psc1speed',
                            delay=f'{p}psc1delay', park=f'{p}psc1park')
@@ -202,7 +202,7 @@ class ServerTestCase(unittest.TestCase):
         cls.proc = ctx.Process(target=serve,
                                args=((cls.disc,), cls.pulse_pv, cls.run_pv), daemon=True)
         cls.proc.start()
-        cls.ctx = Context('pva')
+        cls.ctx = context()
         deadline = time.time() + 30
         while time.time() < deadline:
             if not isinstance(cls.ctx.get(cls.disc.speed, throw=False), Exception):

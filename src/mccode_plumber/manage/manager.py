@@ -1,10 +1,12 @@
 from __future__ import annotations
+import os
 from dataclasses import dataclass, field
 from subprocess import Popen, PIPE
 from threading import Thread
 from enum import Enum
 from colorama import Fore, Back, Style
 from colorama.ansi import AnsiStyle
+from mccode_plumber.pva import ENV
 
 
 class IOType(Enum):
@@ -164,9 +166,10 @@ class Manager:
         # announce start directly instead of sending via a Connection
         print(f'Starting {argv if shell else " ".join(argv)}')
 
+        # Anything speaking EPICS stays on the loopback interface; see mccode_plumber.pva
         manager._process = Popen(
             argv, shell=shell, stdout=PIPE, stderr=PIPE, bufsize=1,
-            universal_newlines=True,
+            universal_newlines=True, env=os.environ | ENV,
         )
         manager._stdout_thread = Thread(
             target=manager._read_stream,

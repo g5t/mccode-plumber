@@ -35,9 +35,9 @@ class EPICSTestCase(unittest.TestCase):
         nothing about the server.
         """
         import time
-        from p4p.client.thread import Context
+        from mccode_plumber.pva import context
         first = f"{self.prefix}{self.pars[0].name}"
-        ctx = Context('pva')
+        ctx = context()
         try:
             deadline = time.time() + timeout
             while time.time() < deadline:
@@ -56,9 +56,10 @@ class EPICSTestCase(unittest.TestCase):
 
     def test_server_runs(self):
         from p4p.client.thread import Context
+        from mccode_plumber.pva import context
         providers = Context.providers()
         self.assertTrue('pva' in providers)
-        ctx = Context('pva')
+        ctx = context()
 
         for par in self.pars:
             pv = ctx.get(f"{self.prefix}{par.name}")
@@ -69,8 +70,8 @@ class EPICSTestCase(unittest.TestCase):
             #     self.assertEqual(pv, par.value.value)
 
     def test_update_pvs(self):
-        from p4p.client.thread import Context
-        ctx = Context('pva')
+        from mccode_plumber.pva import context
+        ctx = context()
         values = {'par1': 1.1, 'par2': 2.2, 'par3': 3, 'par4': 'four', 'par5': 55.555}
         for name, value in values.items():
             ctx.put(f"{self.prefix}{name}", value)
