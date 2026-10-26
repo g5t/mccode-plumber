@@ -225,6 +225,103 @@ def stop_writer(broker, job_id, timeout=STOP_TIMEOUT, pool=None):
     return state
 
 
+#: Elements copied at a time by `compact_nexus`, to bound its memory use.
+COMPACT_BLOCK = 1 << 24
+
+
+#: Numeric datasets at least this large (in bytes) are compressed by `compact_nexus`;
+#: below it, a chunk index costs more than compression saves.
+COMPRESS_MIN = 1 << 16
+
+
+def compact_nexus(filename: Path, compress: bool = True) -> None:
+    """Rewrite a finished NeXus file with every chunked dataset stored at its size.
+
+    kafka-to-nexus makes each dataset it appends to chunked and extensible, and an ev44
+    stream reserves `chunk_size` (default 1M) elements per chunk for all its datasets --
+    one per pulse included -- so a triplet with a few thousand events takes 24 MB. Once
+    the job is done the file no longer grows, so each dataset is stored contiguously --
+    or, with ``compress``, numeric ones of `COMPRESS_MIN` bytes or more in new chunks with
+    the shuffle and gzip filters every HDF5 has: simulated events repeat, one ray sent as
+    many identical events, so a 1.9 GB BIFROST replay becomes 33 MB. Attributes, links
+    and unchunked datasets are copied as they are.
+
+    The copy replaces the file only once it is complete and on disk, with the original's
+    mode, extended attributes (so ACLs) and, where permitted, owner and group; if
+    anything fails, the original is kept.
+    """
+    import os
+    import shutil
+    from math import prod
+    import h5py
+
+    def copy_attrs(src, dst):
+        for name in src.attrs:
+            dst.attrs.create(name, src.attrs[name], dtype=src.attrs.get_id(name).dtype)
+
+    def copy_group(src, dst, seen):
+        copy_attrs(src, dst)
+        for name in src:
+            link = src.get(name, getlink=True)
+            if not isinstance(link, h5py.HardLink):
+                dst[name] = link  # soft and external links, as they are
+                continue
+            obj = src[name]
+            address = h5py.h5o.get_info(obj.id).addr
+            if address in seen:  # a second hard link to an object already copied
+                dst[name] = dst.file[seen[address]]
+                continue
+            if isinstance(obj, h5py.Group):
+                copy_group(obj, dst.create_group(name), seen)
+            elif obj.chunks is None:
+                dst.copy(obj, name)
+            else:
+                filters = {}
+                if compress and obj.dtype.kind in 'biuf' and obj.nbytes >= COMPRESS_MIN:
+                    filters = dict(chunks=True, shuffle=True, compression='gzip',
+                                   compression_opts=1)
+                out = dst.create_dataset(name, shape=obj.shape, dtype=obj.dtype, **filters)
+                rows = max(1, COMPACT_BLOCK // max(1, prod(obj.shape[1:])))
+                for start in range(0, obj.shape[0], rows):
+                    out[start:start + rows] = obj[start:start + rows]
+                copy_attrs(obj, out)
+            seen[address] = dst[name].name
+
+    filename = Path(filename)
+    temporary = filename.with_name(f'.{filename.name}.compact')
+    before = filename.stat().st_size
+    try:
+        # The format kafka-to-nexus writes (superblock 3), not the newest this HDF5 has,
+        # which older readers could not open.
+        with h5py.File(filename, 'r') as src, \
+                h5py.File(temporary, 'w', libver='v110') as dst:
+            copy_group(src, dst, {})
+        with open(temporary, 'r+b') as written:  # Windows cannot sync a read-only handle
+            os.fsync(written.fileno())
+        status = filename.stat()
+        try:
+            os.chown(temporary, status.st_uid, status.st_gid)
+        except (PermissionError, AttributeError):
+            pass  # someone else's file, or Windows (no chown): ours it becomes
+        shutil.copystat(filename, temporary)  # mode, times and extended attributes
+        os.replace(temporary, filename)
+    except Exception as error:
+        temporary.unlink(missing_ok=True)
+        print(f'Could not compact {filename}, which is left as written: {error}')
+        return
+    # The rename too, on filesystems that allow syncing a directory (not all do)
+    try:
+        directory = os.open(filename.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except OSError:
+        pass
+    print(f'Compacted {filename}: {before / 1e6:.1f} MB -> '
+          f'{filename.stat().st_size / 1e6:.1f} MB')
+
+
 def start_writer(start_time: datetime,
                  structure: dict,
                  filename: Path,
@@ -1029,6 +1126,12 @@ def make_splitrun_nexus_parser():
     parser.add_argument('--structure', type=str, default=None, help='NeXus Structure JSON path')
     parser.add_argument('--structure-out', type=str, default=None, help='Output configured structure JSON path')
     parser.add_argument('--nexus-file', type=str, default=None, help='Output NeXus file path')
+    parser.add_argument('--no-compact', dest='compact', action='store_false',
+                        help='Leave the NeXus file as the file-writer wrote it, rather '
+                             'than rewriting its datasets contiguously once it is done')
+    parser.add_argument('--no-compress', dest='compress', action='store_false',
+                        help='Compact without compressing: larger, but read without '
+                             'decompression (simulated events repeat, so gzip saves most)')
     return parser
 
 
@@ -1076,11 +1179,12 @@ def main():
     kwargs = {
         'nexus_file': args.nexus_file, 'structure_out': args.structure_out,
         'choppers': chopper_specs, 'pulse': pulse, 'simulated_logs': simulated_logs,
+        'compact': args.compact, 'compress': args.compress,
     }
     # restage's parser is the base of ours, so strip the arguments only this layer added
     # before the Namespace is handed back to it. Named rather than taken from `kwargs`,
     # which now also carries things that were never argparse attributes.
-    for k in ('nexus_file', 'structure_out', 'broker', 'structure'):
+    for k in ('nexus_file', 'structure_out', 'broker', 'structure', 'compact', 'compress'):
         delattr(args, k)
     try:
         orchestrate(instr, structure, broker, splitrun_kwargs, **kwargs)
@@ -1118,18 +1222,22 @@ def orchestrate(
         simulated_logs: list[SimulatedLog] | None = None,
         run=None,
         description: str | None = None,
+        compact: bool = True,
+        compress: bool = True,
 ):
     """Hold a file-writer job and the forwarder open around one run.
 
     The run is ``restage.splitrun`` with ``splitrun_kwargs``, unless ``run`` is given: then
     it is called with no arguments instead, and ``description`` stands in for the
-    splitrun arguments in the file's title.
+    splitrun arguments in the file's title. Once the writer is done, the file is
+    rewritten by `compact_nexus`, with ``compress``, unless ``compact`` is false.
     """
     from datetime import datetime, timezone
     from restage.splitrun import splitrun_args
     from mccode_plumber.forwarder import (
         forwarder_partial_streams, configure_forwarder, reset_forwarder
     )
+    from mccode_plumber.file_writer_control.JobStatus import JobState
     # Before anything else: a job sent with no free writer waits in the pool and is run,
     # unstoppable, by the next writer to come free.
     pool = idle_writer_pool(broker)
@@ -1177,7 +1285,7 @@ def orchestrate(
             stop_faking_tdc(choppers)
             # Wait for the file-writer to finish its job, through the pool that started
             # it; a job that failed to start has already been told to stop
-            stop_writer(broker, job_id, pool=pool)
+            state = stop_writer(broker, job_id, pool=pool)
         # De-register the forwarder topics
         reset_forwarder(partial_streams, forwarder_config, PREFIX, TOPICS['parameter'])
     # Verify that the file has been written?
@@ -1185,5 +1293,8 @@ def orchestrate(
     # ensure_readable_file(filename)
     if filename.exists():
         print(f'Finished writing {filename}')
+        # Not while the writer might still have it open
+        if compact and pool is not None and state == JobState.DONE:
+            compact_nexus(filename, compress=compress)
     else:
         print(f'{filename} not found, check file-writer working directory')
