@@ -276,7 +276,7 @@ def point_directories(filename: Path, points: int) -> list[Path]:
 
 def replay_into_services(instr, structure, broker: str, filename: Path, config,
                          settle: float, nexus_file=None, structure_out=None,
-                         point_timeout: float | None = None) -> None:
+                         point_timeout: float | None = None, compact: bool = True) -> None:
     """Replay ``filename`` inside a file-writer job, with the forwarder configured for it.
 
     A directory is a scan being simulated, followed point by point; see `follow_points`.
@@ -318,7 +318,7 @@ def replay_into_services(instr, structure, broker: str, filename: Path, config,
         orchestrate(instr, structure, broker, {}, nexus_file=nexus_file,
                     structure_out=structure_out, choppers=choppers,
                     pulse=get_pulse_stream(structure), simulated_logs=simulated_logs,
-                    run=run, description=f'replay of {filename}')
+                    run=run, description=f'replay of {filename}', compact=compact)
     except (WriterUnavailable, PointTimeout) as error:
         print(error)
         raise SystemExit(1)
@@ -346,6 +346,9 @@ def make_replay_parser(prog: str = 'mp-replay', services: bool = False):
       help='NeXus Structure JSON path (default: the instrument file with a .json suffix)')
     a('--structure-out', type=str, default=None, help='Output configured structure JSON path')
     a('--nexus-file', type=str, default=None, help='Output NeXus file path')
+    a('--no-compact', dest='compact', action='store_false',
+      help='Leave the NeXus file as the file-writer wrote it, rather than rewriting its '
+           'datasets contiguously once it is done')
     add_replay_arguments(parser)
     if services:
         from mccode_plumber.manage.orchestrate import add_services_arguments
@@ -363,7 +366,7 @@ def _replay(args) -> None:
     replay_into_services(instr, structure, args.broker or 'localhost:9092',
                          Path(args.collector), replay_config(args), args.settle,
                          nexus_file=args.nexus_file, structure_out=args.structure_out,
-                         point_timeout=args.point_timeout)
+                         point_timeout=args.point_timeout, compact=args.compact)
 
 
 def replay():
