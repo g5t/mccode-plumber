@@ -296,7 +296,7 @@ def compact_nexus(filename: Path, compress: bool = True) -> None:
         with h5py.File(filename, 'r') as src, \
                 h5py.File(temporary, 'w', libver='v110') as dst:
             copy_group(src, dst, {})
-        with open(temporary, 'rb') as written:
+        with open(temporary, 'r+b') as written:  # Windows cannot sync a read-only handle
             os.fsync(written.fileno())
         status = filename.stat()
         try:
