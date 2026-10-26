@@ -1,3 +1,6 @@
+import errno
+import os
+
 import h5py
 import numpy as np
 import pytest
@@ -9,7 +12,7 @@ def _written(path):
         f.attrs['file_name'] = 'written.h5'
         events = f.create_group('entry/instrument/triplet/data')
         events.attrs['NX_class'] = 'NXevent_data'
-        for name, values in (('event_id', np.arange(5000, dtype='int32')),
+        for name, values in (('event_id', np.repeat(np.arange(50, dtype='int32'), 1000)),
                              ('event_time_zero', np.arange(30, dtype='uint64'))):
             dataset = events.create_dataset(name, data=values, maxshape=(None,),
                                             chunks=(1 << 20,))
@@ -40,20 +43,42 @@ def _contents(path):
     return out
 
 
-def test_compact_nexus_keeps_contents(tmp_path):
+@pytest.mark.parametrize('compress', [False, True])
+def test_compact_nexus_keeps_contents(tmp_path, compress):
     from mccode_plumber.manage.orchestrate import compact_nexus
     path = tmp_path / 'written.h5'
     _written(path)
     before, size = _contents(path), path.stat().st_size
 
-    compact_nexus(path)
+    compact_nexus(path, compress=compress)
 
     assert _contents(path) == before
     assert path.stat().st_size < size / 10
     assert not list(tmp_path.glob('.*.compact'))
     with h5py.File(path, 'r', swmr=True) as f:
-        assert f['entry/instrument/triplet/data/event_id'].chunks is None
-        assert f['entry/monitor/signal'].chunks is None
+        events = f['entry/instrument/triplet/data/event_id']  # 20 kB: always compressed
+        assert events.compression == ('gzip' if compress else None)
+        assert events.shuffle is compress
+        assert (events.chunks is not None) is compress
+        assert f['entry/monitor/signal'].chunks is None  # too small to be worth it
+
+
+def test_compact_nexus_keeps_file_attributes(tmp_path):
+    from mccode_plumber.manage.orchestrate import compact_nexus
+    path = tmp_path / 'written.h5'
+    _written(path)
+    try:
+        os.setxattr(path, 'user.origin', b'kafka-to-nexus')
+    except OSError as error:
+        if error.errno in (errno.ENOTSUP, errno.EPERM):
+            pytest.skip('no user extended attributes on this filesystem')
+        raise
+    path.chmod(0o440)
+
+    compact_nexus(path)
+
+    assert os.getxattr(path, 'user.origin') == b'kafka-to-nexus'
+    assert path.stat().st_mode & 0o777 == 0o440
 
 
 def test_compact_nexus_failure_keeps_original(tmp_path, monkeypatch):
@@ -71,8 +96,9 @@ def test_compact_nexus_failure_keeps_original(tmp_path, monkeypatch):
     assert not list(tmp_path.glob('.*.compact'))
 
 
-@pytest.mark.parametrize('flag, expected', [([], True), (['--no-compact'], False)])
-def test_no_compact_flag(flag, expected):
+@pytest.mark.parametrize('flags, compact, compress', [
+    ([], True, True), (['--no-compact'], False, True), (['--no-compress'], True, False)])
+def test_compact_flags(flags, compact, compress):
     from mccode_plumber.manage.replay import make_replay_parser
-    args = make_replay_parser().parse_args(['instr.json', 'collector.h5'] + flag)
-    assert args.compact is expected
+    args = make_replay_parser().parse_args(['instr.json', 'collector.h5'] + flags)
+    assert (args.compact, args.compress) == (compact, compress)

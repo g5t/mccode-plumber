@@ -79,8 +79,10 @@ def main():
     broker = args.broker or 'localhost:9092'
     replay = {name: getattr(args, name) for name in REPLAY_ARGUMENTS}
     config = replay_config(args)
-    nexus_file, structure_out, compact = args.nexus_file, args.structure_out, args.compact
-    for name in ('nexus_file', 'structure_out', 'broker', 'structure', 'compact') + REPLAY_ARGUMENTS:
+    nexus_file, structure_out = args.nexus_file, args.structure_out
+    compact, compress = args.compact, args.compress
+    for name in ('nexus_file', 'structure_out', 'broker', 'structure', 'compact',
+                 'compress') + REPLAY_ARGUMENTS:
         delattr(args, name)
     # Named here rather than by restage, which would name it and keep the name to itself:
     # the replay needs to find what the simulation wrote.
@@ -94,4 +96,5 @@ def main():
     # 2. The replay, inside a file-writer job.
     filename = choose_collector_file(Path(args.dir), replay['collector'])
     replay_into_services(instr, structure, broker, filename, config, replay['settle'],
-                         nexus_file=nexus_file, structure_out=structure_out, compact=compact)
+                         nexus_file=nexus_file, structure_out=structure_out, compact=compact,
+                         compress=compress)
