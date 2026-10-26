@@ -301,8 +301,8 @@ def compact_nexus(filename: Path, compress: bool = True) -> None:
         status = filename.stat()
         try:
             os.chown(temporary, status.st_uid, status.st_gid)
-        except PermissionError:
-            pass  # someone else's file: ours it becomes, as any copy would
+        except (PermissionError, AttributeError):
+            pass  # someone else's file, or Windows (no chown): ours it becomes
         shutil.copystat(filename, temporary)  # mode, times and extended attributes
         os.replace(temporary, filename)
     except Exception as error:

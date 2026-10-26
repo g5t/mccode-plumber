@@ -63,6 +63,8 @@ def test_compact_nexus_keeps_contents(tmp_path, compress):
         assert f['entry/monitor/signal'].chunks is None  # too small to be worth it
 
 
+@pytest.mark.skipif(not hasattr(os, 'setxattr'),
+                    reason='Python has extended attributes only on Linux')
 def test_compact_nexus_keeps_file_attributes(tmp_path):
     from mccode_plumber.manage.orchestrate import compact_nexus
     path = tmp_path / 'written.h5'
