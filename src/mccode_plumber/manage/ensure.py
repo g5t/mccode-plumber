@@ -5,12 +5,16 @@ from os import access, R_OK, W_OK, X_OK
 def message(mode) -> str:
     return {R_OK: 'readable', W_OK: 'writable', X_OK: 'executable'}.get(mode, 'unknown')
 
+def _is_executable_file(p: Path) -> bool:
+    return p.is_file() and access(p, X_OK)
+
 def ensure_executable(path: str| Path) -> Path:
     from shutil import which
     import os
     p = Path(path)
-    # If the path exists as given, accept it (handles absolute and relative files)
-    if p.exists():
+    # If the path is an executable file as given, accept it (handles absolute and relative
+    # files); anything else, e.g. a same-named directory in the cwd, falls through to PATH
+    if _is_executable_file(p):
         return p
 
     # On Windows try PATHEXT extensions for provided path (handles .py etc.)
@@ -19,7 +23,7 @@ def ensure_executable(path: str| Path) -> Path:
             os.pathsep)
         for ext in pathext:
             candidate = Path(str(p) + ext)
-            if candidate.exists():
+            if _is_executable_file(candidate):
                 return candidate
 
     # Fallback to shutil.which (searches PATH and PATHEXT)
