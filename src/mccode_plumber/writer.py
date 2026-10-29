@@ -499,7 +499,7 @@ def kill_list_parser():
     a = parser.add_argument
     a('-b', '--broker', help="Kafka broker", default='localhost:9092', type=str)
     a('-c', '--command', help="Writer command topic", default="WriterCommand", type=str)
-    a('-t', '--topic', help='Writer job topic', default='WriterJobs', type=str)
+    a('-t', '--topic', help='Writer job topic', default='WriterPool', type=str)
     a('-s', '--sleep', help='Post pool creation sleep time (s)', default=1, type=int)
     a('-v', '--version', action='version', version=__version__)
     return parser
