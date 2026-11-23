@@ -101,4 +101,6 @@ def test_the_parser_takes_splitrun_and_replay_arguments():
     assert args.pulses_per_point == 0
     assert make_parser().parse_args(
         ['bifrost.instr.json', '--pulses-per-point', '14']).pulses_per_point == 14
+    assert not args.merge_ibm
+    assert make_parser().parse_args(['bifrost.instr.json', '--merge-ibm']).merge_ibm
     assert all(hasattr(args, name) for name in REPLAY_ARGUMENTS)

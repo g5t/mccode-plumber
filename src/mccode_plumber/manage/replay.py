@@ -233,6 +233,10 @@ def add_replay_arguments(parser) -> None:
            'many pulses into a histogram -- a beam monitor, 14 at ESS -- publishes one per '
            'point; each point then takes PULSES / 14 s to replay (needs '
            'mcstas-readout-master with paced replay)')
+    a('--merge-ibm', action='store_true',
+      help="Send an integrating beam monitor's ray drawn n times as one readout with n "
+           'times its ADC: the same histogram from an EFU writing it as da00, from far '
+           'fewer readouts (needs mcstas-readout-master with merge_ibm)')
     a('--settle', type=float, default=5.0, metavar='SECONDS',
       help='How long to keep the file open after the replay, for the events the EFUs '
            'are still producing (default 5)')
@@ -240,7 +244,8 @@ def add_replay_arguments(parser) -> None:
 
 #: The replay options, by attribute name
 REPLAY_OPTIONS = ('counting_time', 'replay_seed', 'random_order', 'no_fold_tof',
-                  'efu_senders', 'efu_address', 'efu_port', 'pulses_per_point', 'settle')
+                  'efu_senders', 'efu_address', 'efu_port', 'pulses_per_point', 'merge_ibm',
+                  'settle')
 
 
 def replay_config(args):
@@ -248,6 +253,8 @@ def replay_config(args):
     senders = Path(args.efu_senders).read_text() if args.efu_senders else None
     # only when asked for, so an older mcstas_readout without it still replays unpaced
     paced = {'pulses_per_point': args.pulses_per_point} if args.pulses_per_point else {}
+    if args.merge_ibm:
+        paced['merge_ibm'] = True
     return ro.ReplayConfig(counting_time=args.counting_time, seed=args.replay_seed,
                            random_order=args.random_order, senders_json=senders,
                            default_address=args.efu_address, default_port=args.efu_port,
